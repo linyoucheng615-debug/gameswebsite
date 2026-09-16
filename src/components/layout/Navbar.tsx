@@ -44,10 +44,10 @@ export default function Navbar() {
           </div>
           <div>
             <div className="font-black tracking-wider text-lg uppercase bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-cyber-cyan">
-              Versus Arena
+              ITM games
             </div>
             <div className="text-[9px] text-cyber-cyan tracking-widest font-mono uppercase">
-              // Multi-Discipline Tournament Hub
+              // 清大科管所賽事系統
             </div>
           </div>
         </Link>

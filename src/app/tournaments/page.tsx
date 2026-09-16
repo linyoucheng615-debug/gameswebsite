@@ -203,7 +203,7 @@ function TournamentsContent() {
         <div>
           <div className="text-xs font-mono text-cyber-red tracking-widest uppercase mb-1 flex items-center gap-1.5 font-bold">
             <Flame className="w-3.5 h-3.5" />
-            <span>VERSUS ARENA // BATTLE REGISTRY</span>
+            <span>ITM GAMES // 清大科管所賽事大廳</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black uppercase text-white tracking-wide">
             全項目賽事大廳與戰況

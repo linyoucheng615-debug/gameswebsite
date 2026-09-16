@@ -109,14 +109,14 @@ export default function Home() {
       <section className="w-full text-center py-10 sm:py-16 relative">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 mb-6 rounded-full border border-cyber-red/50 bg-cyber-red/15 text-cyber-red text-xs font-mono tracking-widest uppercase shadow-neon-red">
           <Flame className="w-3.5 h-3.5 text-cyber-red animate-pulse" />
-          <span>VERSUS ARENA // NEXT-GEN TOURNAMENT ENGINE</span>
+          <span>ITM GAMES // 清大科管所賽事系統</span>
         </div>
 
         {/* Impactful Persona / Cyber Headline */}
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black uppercase tracking-tight text-white mb-6 leading-tight">
           跨界爭霸・榮耀加冕 <br />
           <span className="bg-clip-text text-transparent bg-gradient-to-r from-cyber-red via-rose-400 to-cyber-cyan text-glow-red">
-            VERSUS ARENA
+            ITM GAMES
           </span>
         </h1>
 
@@ -303,7 +303,7 @@ export default function Home() {
       {/* Footer Preview */}
       <footer className="w-full pt-8 border-t border-cyber-border/60 flex flex-col sm:flex-row items-center justify-between text-xs text-cyber-muted gap-4">
         <div className="flex flex-wrap items-center gap-4">
-          <p>© 2026 VERSUS ARENA // 全方位電競與多項目競賽管理平台.</p>
+          <p>© 2026 ITM games // 清大科管所賽事系統. All Rights Reserved.</p>
           <Link href="/guide" className="text-cyber-cyan hover:underline font-bold flex items-center gap-1">
             <BookOpen className="w-3.5 h-3.5" />
             新手使用教學與指南

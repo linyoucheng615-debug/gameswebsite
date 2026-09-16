@@ -40,7 +40,7 @@ export default function GuidePage() {
       <div className="text-center mb-10">
         <div className="inline-flex items-center gap-2 px-3.5 py-1 mb-4 rounded-full border border-cyber-cyan/50 bg-cyber-cyan/10 text-cyber-cyan text-xs font-mono tracking-widest uppercase shadow-neon-cyan/20">
           <BookOpen className="w-3.5 h-3.5 text-cyber-cyan animate-pulse" />
-          <span>VERSUS ARENA // COMPREHENSIVE USER MANUAL</span>
+          <span>ITM GAMES // 清大科管所賽事系統</span>
         </div>
         <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight uppercase mb-4">
           平台完整使用指南與教學
@@ -109,11 +109,11 @@ export default function GuidePage() {
             <div className="flex items-center gap-3 mb-3">
               <Sparkles className="w-6 h-6 text-cyber-cyan" />
               <h2 className="text-xl sm:text-2xl font-black text-white">
-                歡迎來到 VERSUS ARENA 多項目賽事中樞
+                歡迎來到 ITM games 清大科管所賽事系統
               </h2>
             </div>
             <p className="text-sm text-slate-300 leading-relaxed mb-6">
-              VERSUS ARENA 專為 <span className="text-cyber-cyan font-bold">電子競技</span>、
+              ITM games 專為 <span className="text-cyber-cyan font-bold">電子競技</span>、
               <span className="text-emerald-400 font-bold">球類運動</span>、
               <span className="text-amber-400 font-bold">桌上卡牌 (TCG)</span> 與
               <span className="text-rose-400 font-bold">智力棋類</span> 等對抗型運動量身打造。
@@ -539,3 +539,4 @@ export default function GuidePage() {
     </div>
   );
 }
+

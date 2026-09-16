@@ -141,7 +141,7 @@ export default function ProfilePage() {
         <div>
           <div className="text-xs font-mono text-cyber-cyan tracking-widest uppercase mb-1 flex items-center gap-1.5 font-bold">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>VERSUS ARENA // COMBATANT PROFILE</span>
+            <span>ITM GAMES // 清大科管所選手中心</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black uppercase text-white tracking-wide">
             選手中心與戰績檔案

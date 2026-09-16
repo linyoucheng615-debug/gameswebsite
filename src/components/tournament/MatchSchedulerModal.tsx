@@ -548,7 +548,7 @@ export default function MatchSchedulerModal({
 
         {/* Footer */}
         <div className="px-5 sm:px-7 py-3 border-t border-cyber-border bg-cyber-darkest/60 flex items-center justify-between text-xs font-mono text-slate-500 shrink-0">
-          <span>// VERSUS ARENA TIME COORDINATOR</span>
+          <span>// ITM GAMES TIME COORDINATOR</span>
           <button
             onClick={onClose}
             className="px-4 py-1.5 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white font-bold transition-all cyber-cut-br"

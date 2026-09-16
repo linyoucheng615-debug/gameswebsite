@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "VERSUS ARENA // 全方位電競與多項目競賽管理系統",
-  description: "次世代動漫電競風格全方位賽事排程與比分管理系統，支援電子競技、球類運動、桌上卡牌、棋類智力等多賽制競賽",
+  title: "ITM games // 清大科管所賽事系統",
+  description: "清大科管所賽事系統 - 專為各項競賽打造之智慧賽事排程、對戰時間媒合與戰績管理平台",
 };
 
 import Navbar from "@/components/layout/Navbar";

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Trophy, User, Shield } from "lucide-react";
+import { Home, Trophy, User, Shield, BookOpen } from "lucide-react";
 import { UserProfile } from "@/types";
 
 export default function MobileNav() {
@@ -26,6 +26,7 @@ export default function MobileNav() {
   const navItems = [
     { label: "首頁", href: "/", icon: Home },
     { label: "賽事", href: "/tournaments", icon: Trophy },
+    { label: "教學", href: "/guide", icon: BookOpen },
     { label: "個人", href: user ? "/profile" : "/login", icon: User },
     ...(user?.role === "admin"
       ? [{ label: "管理", href: "/admin/users", icon: Shield }]
