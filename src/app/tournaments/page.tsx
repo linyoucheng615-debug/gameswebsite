@@ -17,6 +17,7 @@ import {
   Layers,
   Activity,
   Flame,
+  Trash2,
 } from "lucide-react";
 import { UserProfile, TournamentCategory } from "@/types";
 
@@ -32,6 +33,7 @@ interface TournamentItem {
   totalRounds: number;
   createdAt: string;
   creator: { id: string; name: string; nickname: string };
+  createdBy?: string;
   _count: { participants: number; matches: number };
 }
 
@@ -116,6 +118,27 @@ function TournamentsContent() {
       }
     } finally {
       setCreateLoading(false);
+    }
+  }
+
+  async function handleDeleteTournament(e: React.MouseEvent, id: string, name: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm(`⚠️ 確定要刪除盃賽「${name}」嗎？\n此動作將一併清除該盃賽之所有賽程與報名紀錄，無法復原。`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/tournaments/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "刪除失敗");
+      alert(data.message || "盃賽已成功刪除！");
+      loadData();
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("刪除賽事發生錯誤");
+      }
     }
   }
 
@@ -317,7 +340,18 @@ function TournamentsContent() {
                       <span>{cat.label}</span>
                     </span>
 
-                    {getStatusBadge(t.status)}
+                    <div className="flex items-center gap-1.5">
+                      {getStatusBadge(t.status)}
+                      {currentUser && (currentUser.role === "admin" || t.creator?.id === currentUser.id || t.createdBy === currentUser.id) && (
+                        <button
+                          onClick={(e) => handleDeleteTournament(e, t.id, t.name)}
+                          className="p-1 text-slate-500 hover:text-red-400 hover:bg-red-950/40 rounded transition-colors"
+                          title="刪除此盃賽"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="mb-2">

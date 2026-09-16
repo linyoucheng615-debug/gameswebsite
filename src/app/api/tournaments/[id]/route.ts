@@ -76,3 +76,45 @@ export async function GET(
   }
 }
 
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "請先登入" }, { status: 401 });
+    }
+
+    const { id } = params;
+    const tournament = await prisma.tournament.findUnique({
+      where: { id },
+    });
+
+    if (!tournament) {
+      return NextResponse.json({ error: "找不到該賽事" }, { status: 404 });
+    }
+
+    // Permission check: Global admin or the tournament creator
+    const isAuthorized = user.role === "admin" || tournament.createdBy === user.id;
+    if (!isAuthorized) {
+      return NextResponse.json({ error: "無權限刪除此賽事" }, { status: 403 });
+    }
+
+    // Cascade delete in transaction
+    await prisma.$transaction([
+      prisma.match.deleteMany({ where: { tournamentId: id } }),
+      prisma.tournamentParticipant.deleteMany({ where: { tournamentId: id } }),
+      prisma.tournament.delete({ where: { id } }),
+    ]);
+
+    return NextResponse.json({ success: true, message: `賽事「${tournament.name}」已成功刪除` });
+  } catch (error: any) {
+    console.error("Delete tournament error:", error);
+    return NextResponse.json(
+      { error: error?.message || "刪除賽事失敗" },
+      { status: 500 }
+    );
+  }
+}
+

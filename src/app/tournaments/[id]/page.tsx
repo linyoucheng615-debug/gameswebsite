@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Flame,
   BarChart3,
+  Trash2,
 } from "lucide-react";
 import { UserProfile, Tournament, Match, TournamentParticipant } from "@/types";
 import MatchCard from "@/components/tournament/MatchCard";
@@ -174,6 +175,36 @@ export default function TournamentDetailPage() {
 
       setFeedback({ type: "success", text: resData.message });
       loadDetails();
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setFeedback({ type: "error", text: err.message });
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  // 管理員/主辦人：刪除盃賽
+  async function handleDeleteTournament() {
+    if (
+      !confirm(
+        `⚠️ 確定要刪除盃賽「${tournament.name}」嗎？\n\n此動作將一併永久清除該盃賽之所有賽程配對、對戰比分與選手報名紀錄，無法復原！`
+      )
+    ) {
+      return;
+    }
+
+    setActionLoading(true);
+    setFeedback(null);
+    try {
+      const res = await fetch(`/api/tournaments/${id}`, {
+        method: "DELETE",
+      });
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || "刪除賽事失敗");
+
+      alert(resData.message || "盃賽已成功刪除！");
+      router.push("/tournaments");
     } catch (err: unknown) {
       if (err instanceof Error) {
         setFeedback({ type: "error", text: err.message });
@@ -369,6 +400,16 @@ export default function TournamentDetailPage() {
                     完結盃賽
                   </button>
                 )}
+
+                <button
+                  onClick={handleDeleteTournament}
+                  disabled={actionLoading}
+                  className="px-3 py-1.5 bg-red-950/80 hover:bg-red-900 border border-red-500/60 text-red-300 hover:text-white font-bold text-xs uppercase cyber-cut-corner shadow-neon-red/30 transition-all flex items-center gap-1.5 ml-auto"
+                  title="刪除此盃賽 (僅限管理員或主辦人)"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                  刪除盃賽
+                </button>
               </div>
             )}
           </div>
@@ -436,7 +477,11 @@ export default function TournamentDetailPage() {
           }`}
         >
           <Award className="w-4 h-4" />
-          單淘汰晉級樹狀圖
+          {tournament.format === "swiss"
+            ? "瑞士制進程與晉級圖"
+            : tournament.format === "round_robin"
+            ? "分組循環對決進程圖"
+            : "單淘汰晉級樹狀圖"}
         </button>
 
         <button
@@ -525,6 +570,11 @@ export default function TournamentDetailPage() {
         <BracketView
           matches={tournament.matches}
           currentUser={currentUser}
+          format={tournament.format}
+          participants={tournament.participants}
+          topCut={tournament.topCut}
+          currentRound={tournament.currentRound}
+          totalRounds={tournament.totalRounds}
           onSelectMatch={(m) => setSelectedMatch(m)}
         />
       )}
