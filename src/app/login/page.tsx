@@ -65,8 +65,8 @@ function LoginForm() {
       <div className="w-full max-w-md">
         {/* Header Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 bg-cyber-red/20 border border-cyber-red/40 items-center justify-center font-black text-2xl text-cyber-red mb-3 cyber-cut-corner shadow-neon-red">
-            ♚
+          <div className="inline-flex w-12 h-12 bg-cyber-red/20 border border-cyber-red/40 items-center justify-center text-cyber-red mb-3 cyber-cut-corner shadow-neon-red">
+            <ShieldCheck className="w-6 h-6 text-cyber-red" />
           </div>
           <h1 className="text-3xl font-black tracking-wider uppercase text-white">
             Authentication

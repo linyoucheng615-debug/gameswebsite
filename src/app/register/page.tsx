@@ -70,8 +70,8 @@ export default function RegisterPage() {
       <div className="w-full max-w-lg">
         {/* Title Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex w-12 h-12 bg-cyber-cyan/15 border border-cyber-cyan/40 items-center justify-center font-black text-2xl text-cyber-cyan mb-3 cyber-cut-corner shadow-neon-cyan">
-            ♟
+          <div className="inline-flex w-12 h-12 bg-cyber-cyan/15 border border-cyber-cyan/40 items-center justify-center text-cyber-cyan mb-3 cyber-cut-corner shadow-neon-cyan">
+            <UserPlus className="w-6 h-6 text-cyber-cyan" />
           </div>
           <h1 className="text-3xl font-black tracking-wider uppercase text-white">
             Player Registration

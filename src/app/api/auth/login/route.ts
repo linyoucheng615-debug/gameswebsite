@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { comparePassword, signToken, setAuthCookie } from "@/lib/auth";
+import { comparePassword, signToken, setAuthCookie, COOKIE_NAME } from "@/lib/auth";
 import { UserRole } from "@/types";
 
 export async function POST(req: Request) {
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
 
     setAuthCookie(token);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: {
         id: user.id,
@@ -59,9 +59,22 @@ export async function POST(req: Request) {
         createdAt: user.createdAt.toISOString(),
       },
     });
-  } catch (error) {
-    console.error("Login error:", error);
-    return NextResponse.json({ error: "伺服器內部錯誤，請稍後再試" }, { status: 500 });
+
+    response.cookies.set(COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+    });
+
+    return response;
+  } catch (error: any) {
+    console.error("[AUTH ERROR]:", error);
+    return NextResponse.json(
+      { error: error?.message || "伺服器內部錯誤", details: error?.stack },
+      { status: 500 }
+    );
   }
 }
 

@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import bcrypt from "bcryptjs";
+import { hash, compare } from "bcryptjs";
 import { cookies } from "next/headers";
 import prisma from "./prisma";
 import { UserProfile, UserRole } from "@/types";
@@ -8,7 +8,7 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "chess-arena-cyber-jwt-secret-key-super-secure-2026"
 );
 
-const COOKIE_NAME = "chess_arena_token";
+export const COOKIE_NAME = "chess_arena_token";
 
 export interface TokenPayload {
   userId: string;
@@ -18,12 +18,12 @@ export interface TokenPayload {
 
 // 密碼雜湊
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return hash(password, 10);
 }
 
 // 密碼驗證
 export async function comparePassword(plain: string, hashed: string): Promise<boolean> {
-  return bcrypt.compare(plain, hashed);
+  return compare(plain, hashed);
 }
 
 // 簽發 JWT Token
