@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Swords, Shield, User, LogIn, UserPlus, LogOut, Trophy } from "lucide-react";
+import { Swords, Shield, User, LogIn, UserPlus, LogOut, Trophy, BookOpen } from "lucide-react";
 import { UserProfile } from "@/types";
 
 export default function Navbar() {
@@ -64,6 +64,18 @@ export default function Navbar() {
           >
             <Trophy className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">賽事專區</span>
+          </Link>
+
+          <Link
+            href="/guide"
+            className={`px-3 py-1.5 text-xs font-semibold tracking-wider transition-colors flex items-center gap-1.5 ${
+              pathname.startsWith("/guide")
+                ? "text-cyber-cyan border-b-2 border-cyber-cyan"
+                : "text-slate-300 hover:text-white"
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-cyber-cyan" />
+            <span>使用教學</span>
           </Link>
 
           {!loading && user ? (

@@ -16,6 +16,7 @@ import {
   Layers,
   CheckCircle2,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { UserProfile } from "@/types";
 
@@ -138,21 +139,29 @@ export default function Home() {
             進入全項目賽事大廳
           </Link>
 
+          <Link
+            href="/guide"
+            className="px-6 py-3.5 bg-cyber-surface border border-cyber-cyan/70 text-cyber-cyan hover:bg-cyber-cyan/15 font-bold tracking-wider text-base cyber-cut-corner hover:shadow-neon-cyan transition-all flex items-center gap-2.5"
+          >
+            <BookOpen className="w-5 h-5 text-cyber-cyan" />
+            使用教學指南
+          </Link>
+
           {!loading && user ? (
             <Link
               href="/profile"
-              className="px-8 py-3.5 bg-cyber-surface border border-cyber-cyan text-cyber-cyan hover:bg-cyber-cyan/10 font-bold tracking-wider text-base cyber-cut-corner hover:shadow-neon-cyan transition-all flex items-center gap-2.5"
+              className="px-6 py-3.5 bg-cyber-card border border-cyber-border-bright text-slate-200 hover:text-white hover:border-slate-400 font-bold tracking-wider text-base cyber-cut-corner transition-all flex items-center gap-2.5"
             >
-              <UserCheck className="w-5 h-5" />
+              <UserCheck className="w-5 h-5 text-emerald-400" />
               選手中心 ({user.nickname})
             </Link>
           ) : (
             <Link
               href="/register"
-              className="px-8 py-3.5 bg-cyber-surface border border-cyber-border-bright text-cyber-cyan hover:text-white hover:border-cyber-cyan font-bold tracking-wider text-base cyber-cut-corner hover:shadow-neon-cyan transition-all flex items-center gap-2.5"
+              className="px-6 py-3.5 bg-cyber-card border border-cyber-border-bright text-slate-200 hover:text-white hover:border-slate-400 font-bold tracking-wider text-base cyber-cut-corner transition-all flex items-center gap-2.5"
             >
-              <Sparkles className="w-5 h-5" />
-              立即註冊選手席位
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              註冊選手席位
             </Link>
           )}
         </div>
@@ -293,8 +302,14 @@ export default function Home() {
 
       {/* Footer Preview */}
       <footer className="w-full pt-8 border-t border-cyber-border/60 flex flex-col sm:flex-row items-center justify-between text-xs text-cyber-muted gap-4">
-        <p>© 2026 VERSUS ARENA // 全方位電競與多項目競賽管理平台. All Rights Reserved.</p>
-        <p className="font-mono text-[11px] text-slate-500">POWERED BY NEXT.JS 14 // TAILWIND // PRISMA</p>
+        <div className="flex flex-wrap items-center gap-4">
+          <p>© 2026 VERSUS ARENA // 全方位電競與多項目競賽管理平台.</p>
+          <Link href="/guide" className="text-cyber-cyan hover:underline font-bold flex items-center gap-1">
+            <BookOpen className="w-3.5 h-3.5" />
+            新手使用教學與指南
+          </Link>
+        </div>
+        <p className="font-mono text-[11px] text-slate-500">POWERED BY NEXT.JS 14 // TAILWIND // PRISMA // TURSO</p>
       </footer>
     </main>
   );
