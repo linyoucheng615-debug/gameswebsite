@@ -83,6 +83,9 @@ model Match {
   player1Result   String?   // "win" | "loss" | "draw"
   player2Result   String?   // "win" | "loss" | "draw"
   status          String    @default("pending") // "pending" | "finished"
+  player1Slots    String?   // JSON array string of available time slot IDs for player 1
+  player2Slots    String?   // JSON array string of available time slot IDs for player 2
+  scheduledTime   String?   // Confirmed agreed match time description
   reportedBy      String?   // 登記該對局結果的 userId 或 "ADMIN"
   reportedAt      DateTime?
   createdAt       DateTime  @default(now())

@@ -213,14 +213,22 @@ function TournamentsContent() {
           </p>
         </div>
 
-        {currentUser?.role === "admin" && (
+        {currentUser ? (
           <button
             onClick={() => setCreateModalOpen(true)}
-            className="px-5 py-3 bg-cyber-red hover:bg-cyber-red-hover text-white font-black text-xs uppercase cyber-cut-corner shadow-neon-red transition-all flex items-center gap-2 self-start md:self-auto shrink-0"
+            className="px-5 py-3 bg-cyber-red hover:bg-cyber-red-hover text-white font-black text-xs uppercase cyber-cut-corner shadow-neon-red transition-all flex items-center gap-2 self-start md:self-auto shrink-0 active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            發起新比賽
+            發起新盃賽
           </button>
+        ) : (
+          <Link
+            href="/login?redirect=/tournaments"
+            className="px-5 py-3 bg-cyber-surface border border-cyber-border hover:border-cyber-cyan text-slate-300 hover:text-white font-bold text-xs uppercase cyber-cut-corner transition-all flex items-center gap-2 self-start md:self-auto shrink-0"
+          >
+            <Plus className="w-4 h-4 text-cyber-cyan" />
+            登入後發起盃賽
+          </Link>
         )}
       </div>
 
@@ -333,8 +341,24 @@ function TournamentsContent() {
                   )}
                 </div>
 
-                {/* Meta stats */}
-                <div className="mt-6 pt-4 border-t border-cyber-border/80 flex items-center justify-between text-xs font-mono text-slate-400">
+                {/* Organizer & Meta stats */}
+                <div className="mt-4 pt-3 border-t border-cyber-border/60 flex items-center justify-between text-[11px] font-mono text-slate-400">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-slate-500">主辦：</span>
+                    <span className="text-slate-300 font-semibold truncate">{t.creator?.nickname || t.creator?.name || "匿名主辦"}</span>
+                    {currentUser?.id === t.creator?.id && (
+                      <span className="px-1.5 py-0.2 bg-cyber-cyan/15 text-cyber-cyan border border-cyber-cyan/30 text-[9px] font-bold rounded">
+                        您的主辦
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 text-slate-500">
+                    <Clock className="w-3 h-3 text-slate-500" />
+                    <span>{new Date(t.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                <div className="mt-2 pt-2 border-t border-cyber-border/40 flex items-center justify-between text-xs font-mono text-slate-400">
                   <div className="flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-cyber-cyan" />
                     <span>{t._count.participants} 位選手</span>
@@ -357,18 +381,21 @@ function TournamentsContent() {
         </div>
       )}
 
-      {/* Admin Create Tournament Modal */}
+      {/* Create Tournament Modal */}
       {createModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-lg bg-cyber-card border border-cyber-border-bright p-6 sm:p-8 cyber-cut-corner shadow-cyber-card relative">
+          <div className="w-full max-w-lg bg-cyber-card border border-cyber-border-bright p-6 sm:p-8 cyber-cut-corner shadow-cyber-card relative max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-cyber-border pb-4 mb-6">
               <div>
-                <span className="text-[10px] font-mono text-cyber-red tracking-widest uppercase font-bold">
-                  // New Tournament Protocol
+                <span className="text-[10px] font-mono text-cyber-cyan tracking-widest uppercase font-bold">
+                  // Autonomous Tournament Creation
                 </span>
                 <h2 className="text-xl font-black uppercase text-white tracking-wide">
-                  發起新競賽賽程
+                  發起新競賽賽程 (自主主辦)
                 </h2>
+                <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  所有登入選手均可建立賽事並獲得該賽事管理與配對推進權限。
+                </p>
               </div>
               <button
                 onClick={() => setCreateModalOpen(false)}

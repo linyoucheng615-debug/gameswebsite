@@ -36,6 +36,7 @@ interface TournamentDetailData {
   currentUser: UserProfile | null;
   isJoined: boolean;
   isAdmin: boolean;
+  isOrganizer?: boolean;
 }
 
 export default function TournamentDetailPage() {
@@ -195,6 +196,9 @@ export default function TournamentDetailPage() {
   if (!data) return null;
 
   const { tournament, currentUser, isJoined, isAdmin } = data;
+  const isOrganizer = Boolean(
+    data.isOrganizer || isAdmin || (currentUser && tournament.createdBy === currentUser.id)
+  );
 
   // Filter matches by round
   const filteredMatches = tournament.matches.filter((m) => {
@@ -281,7 +285,14 @@ export default function TournamentDetailPage() {
                 <Users className="w-3.5 h-3.5 text-cyber-cyan" />
                 {tournament.participants.length} 人參賽
               </span>
-              <span>主辦：{tournament.creator.nickname}</span>
+              <span className="flex items-center gap-1.5">
+                <span>主辦：{tournament.creator?.nickname || tournament.creator?.name || "匿名主辦"}</span>
+                {currentUser?.id === tournament.createdBy && (
+                  <span className="px-1.5 py-0.2 bg-cyber-cyan/20 border border-cyber-cyan/40 text-cyber-cyan text-[10px] font-bold rounded">
+                    您為主辦人
+                  </span>
+                )}
+              </span>
             </div>
           </div>
 
@@ -307,11 +318,11 @@ export default function TournamentDetailPage() {
               </>
             )}
 
-            {/* Admin Management Toolbar */}
-            {isAdmin && (
+            {/* Organizer & Admin Management Toolbar */}
+            {isOrganizer && (
               <div className="flex flex-wrap items-center gap-2 p-2 bg-cyber-darkest/90 border border-cyber-border-bright cyber-cut-corner">
-                <span className="text-[10px] font-mono text-cyber-red font-bold px-2 uppercase">
-                  Admin:
+                <span className="text-[10px] font-mono text-cyber-cyan font-bold px-2 uppercase">
+                  {isAdmin ? "Admin/主辦:" : "賽事主辦人:"}
                 </span>
 
                 {tournament.status === "pending" && (

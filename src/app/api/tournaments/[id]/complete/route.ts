@@ -11,11 +11,8 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "admin") {
-      return NextResponse.json(
-        { error: "權限不足，僅賽事管理員可結束比賽" },
-        { status: 403 }
-      );
+    if (!user) {
+      return NextResponse.json({ error: "請先登入帳號" }, { status: 401 });
     }
 
     const { id } = params;
@@ -28,6 +25,14 @@ export async function POST(
 
     if (!tournament) {
       return NextResponse.json({ error: "找不到該賽事" }, { status: 404 });
+    }
+
+    const isOrganizer = user.role === "admin" || tournament.createdBy === user.id;
+    if (!isOrganizer) {
+      return NextResponse.json(
+        { error: "權限不足，僅賽事主辦人或管理員可結束比賽" },
+        { status: 403 }
+      );
     }
 
     // 更新賽事狀態為已完賽

@@ -14,11 +14,8 @@ export async function POST(
 ) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "admin") {
-      return NextResponse.json(
-        { error: "權限不足：僅賽事管理員可覆寫爭議比分" },
-        { status: 403 }
-      );
+    if (!user) {
+      return NextResponse.json({ error: "請先登入帳號" }, { status: 401 });
     }
 
     const { id } = params;
@@ -66,10 +63,19 @@ export async function POST(
 
     const match = await prisma.match.findUnique({
       where: { id },
+      include: { tournament: true },
     });
 
     if (!match) {
       return NextResponse.json({ error: "找不到該對局場次" }, { status: 404 });
+    }
+
+    const isOrganizer = user.role === "admin" || match.tournament.createdBy === user.id;
+    if (!isOrganizer) {
+      return NextResponse.json(
+        { error: "權限不足：僅賽事主辦人或管理員可覆寫爭議比分" },
+        { status: 403 }
+      );
     }
 
     // 更新管理員覆寫比分

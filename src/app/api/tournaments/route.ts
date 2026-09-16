@@ -26,12 +26,12 @@ export async function GET() {
   }
 }
 
-// POST /api/tournaments - 管理員建立新賽事
+// POST /api/tournaments - 建立新賽事 (開放所有登入選手自主建立並成為該賽事主辦人)
 export async function POST(req: Request) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== "admin") {
-      return NextResponse.json({ error: "權限不足，僅賽事管理員可建立比賽" }, { status: 403 });
+    if (!user) {
+      return NextResponse.json({ error: "請先登入帳號後再發起盃賽" }, { status: 401 });
     }
 
     const { name, description, format, category, totalRounds, topCut } = await req.json();

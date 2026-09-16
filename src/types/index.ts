@@ -92,9 +92,34 @@ export interface Match {
   player1Result: MatchResult;
   player2Result: MatchResult;
   status: MatchStatus;
+  player1Slots?: string | null;
+  player2Slots?: string | null;
+  scheduledTime?: string | null;
   reportedBy?: string | null;
   reporter?: { id: string; nickname: string } | null;
   player1?: UserProfile;
   player2?: UserProfile;
+}
+
+export type SlotPeriod = "morning" | "afternoon" | "evening" | "night";
+
+export interface TimeSlotOption {
+  id: string; // e.g. "2026-09-21-evening"
+  dateStr: string; // e.g. "2026-09-21"
+  dayLabel: string; // e.g. "下週一 (9/21)"
+  dayName: string; // e.g. "週一"
+  period: SlotPeriod;
+  periodLabel: string; // e.g. "晚間 (18:00 - 21:00)"
+  isWeekend: boolean;
+}
+
+export interface SlotMatchAnalysis {
+  player1Submitted: boolean;
+  player2Submitted: boolean;
+  bothSubmitted: boolean;
+  commonSlots: TimeSlotOption[];
+  hasOverlap: boolean;
+  player1SlotDetails: TimeSlotOption[];
+  player2SlotDetails: TimeSlotOption[];
 }
 

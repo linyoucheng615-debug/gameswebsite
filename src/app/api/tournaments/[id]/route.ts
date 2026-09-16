@@ -59,11 +59,16 @@ export async function GET(
       user && tournament.participants.some((p) => p.userId === user.id)
     );
 
+    const isOrganizer = Boolean(
+      user && (user.role === "admin" || tournament.createdBy === user.id)
+    );
+
     return NextResponse.json({
       tournament,
       currentUser: user,
       isJoined,
       isAdmin: user?.role === "admin",
+      isOrganizer,
     });
   } catch (error) {
     console.error("Fetch tournament details error:", error);

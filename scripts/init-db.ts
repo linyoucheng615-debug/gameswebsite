@@ -115,6 +115,9 @@ async function initDb() {
       "player1Result" TEXT,
       "player2Result" TEXT,
       "status" TEXT NOT NULL DEFAULT 'pending',
+      "player1Slots" TEXT,
+      "player2Slots" TEXT,
+      "scheduledTime" TEXT,
       "reportedBy" TEXT,
       "reportedAt" DATETIME,
       "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -125,6 +128,17 @@ async function initDb() {
       FOREIGN KEY ("reportedBy") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
     );
   `);
+
+  // 擴充現有 matches 表的約戰時段欄位（若已存在則忽略）
+  try {
+    await db.execute(`ALTER TABLE "matches" ADD COLUMN "player1Slots" TEXT;`);
+  } catch {}
+  try {
+    await db.execute(`ALTER TABLE "matches" ADD COLUMN "player2Slots" TEXT;`);
+  } catch {}
+  try {
+    await db.execute(`ALTER TABLE "matches" ADD COLUMN "scheduledTime" TEXT;`);
+  } catch {}
 
   console.log("\n✅ Turso 雲端資料庫資料表結構初始化完成！");
 

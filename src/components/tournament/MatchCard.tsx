@@ -1,9 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { Trophy, Swords, ShieldAlert, CheckCircle2, Clock } from "lucide-react";
+import { useState, useMemo } from "react";
+import {
+  Trophy,
+  Swords,
+  ShieldAlert,
+  CheckCircle2,
+  Clock,
+  Calendar,
+  CalendarCheck,
+  Sparkles,
+} from "lucide-react";
 import { Match, UserProfile } from "@/types";
 import QuickReportModal from "./QuickReportModal";
+import MatchSchedulerModal from "./MatchSchedulerModal";
+import { analyzeMatchSlots } from "@/lib/tournament/scheduleHelper";
 
 interface MatchCardProps {
   match: Match;
@@ -17,6 +28,7 @@ export default function MatchCard({
   onRefresh,
 }: MatchCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
 
   const isP1 = currentUser && match.player1Id === currentUser.id;
   const isP2 = currentUser && match.player2Id === currentUser.id;
@@ -27,6 +39,12 @@ export default function MatchCard({
   const p1Won = match.player1Result === "win";
   const p2Won = match.player2Result === "win";
   const isDraw = match.player1Result === "draw";
+
+  // 電腦交集分析
+  const analysis = useMemo(
+    () => analyzeMatchSlots(match.player1Slots, match.player2Slots),
+    [match.player1Slots, match.player2Slots]
+  );
 
   return (
     <>
@@ -129,8 +147,69 @@ export default function MatchCard({
           </div>
         </div>
 
+        {/* Match Scheduling Section (約戰時間協調區塊) */}
+        {!isFinished && match.player2Id && (
+          <div className="my-2.5 p-2.5 bg-cyber-darkest/70 border border-cyber-border/70 cyber-cut-br">
+            {match.scheduledTime ? (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs truncate">
+                  <CalendarCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-[11px] font-mono text-slate-400">約戰：</span>
+                  <span className="text-xs font-bold text-emerald-300 truncate" title={match.scheduledTime}>
+                    {match.scheduledTime}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(true)}
+                  className="text-[11px] font-mono text-cyber-cyan hover:underline shrink-0"
+                >
+                  調整
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs truncate">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  {analysis.hasOverlap ? (
+                    <span className="text-[11px] font-mono text-cyan-300 font-bold flex items-center gap-1 truncate">
+                      <Sparkles className="w-3 h-3 text-cyber-gold shrink-0" />
+                      電腦發現 {analysis.commonSlots.length} 個共同空檔！
+                    </span>
+                  ) : analysis.bothSubmitted ? (
+                    <span className="text-[11px] font-mono text-amber-400 truncate">
+                      雙方時間暫無交集，協調中
+                    </span>
+                  ) : analysis.player1Submitted || analysis.player2Submitted ? (
+                    <span className="text-[11px] font-mono text-slate-400 truncate">
+                      已有 1 方提交，等待對手...
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-mono text-slate-400 truncate">
+                      尚未約定開戰時段
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(true)}
+                  className={`px-2.5 py-1 text-[11px] font-bold font-mono transition-all cyber-cut-br flex items-center gap-1 shrink-0 ${
+                    analysis.hasOverlap
+                      ? "bg-gradient-to-r from-cyber-cyan to-blue-500 text-cyber-darkest font-black shadow-neon-cyan active:scale-95"
+                      : "bg-cyber-surface hover:bg-cyber-card border border-cyber-border hover:border-cyber-cyan text-slate-300 hover:text-white"
+                  }`}
+                >
+                  <Clock className="w-3 h-3" />
+                  <span>{analysis.hasOverlap ? "查看共同時段" : "約戰協調"}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Bottom Action Area */}
-        <div className="mt-3 pt-2 flex items-center justify-between">
+        <div className="mt-2 pt-2 flex items-center justify-between">
           <div className="text-[10px] font-mono text-slate-500 truncate">
             {match.reportedBy && (
               <span>回報者：{match.reporter?.nickname || "系統/管理員"}</span>
@@ -149,7 +228,7 @@ export default function MatchCard({
               </button>
             )}
 
-            {/* Admin Override Button */}
+            {/* Admin / Organizer Override Button */}
             {isAdmin && (
               <button
                 onClick={() => setModalOpen(true)}
@@ -172,7 +251,18 @@ export default function MatchCard({
           onSuccess={onRefresh}
         />
       )}
+
+      {/* Match Scheduling Modal */}
+      <MatchSchedulerModal
+        match={match}
+        currentUser={currentUser}
+        isOpen={scheduleModalOpen}
+        onClose={() => setScheduleModalOpen(false)}
+        onSuccess={() => {
+          setScheduleModalOpen(false);
+          onRefresh();
+        }}
+      />
     </>
   );
 }
-
