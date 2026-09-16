@@ -78,9 +78,7 @@ function LoginForm() {
 
         {/* Card */}
         <div className="bg-cyber-card border border-cyber-border-bright p-8 cyber-cut-br shadow-cyber-card relative">
-          <div className="absolute -top-3 right-6 px-3 py-0.5 bg-cyber-red text-white text-[10px] font-mono tracking-widest uppercase font-bold cyber-skew-btn">
-            <span className="cyber-skew-content">Identity Gate</span>
-          </div>
+
 
           {error && (
             <div className="mb-6 p-3 bg-red-950/60 border border-cyber-red text-red-200 text-sm flex items-center gap-2 cyber-cut-br">
