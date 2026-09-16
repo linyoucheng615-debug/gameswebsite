@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  studentId    String   @unique
+  name         String
+  nickname     String
+  role         String   @default("player") // "admin" | "player"
+  passwordHash String
+  avatar       String   @default("cyber-fox")
+  motto        String?  @default("超越極限，榮耀加冕！")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdTournaments Tournament[]            @relation("TournamentCreator")
+  participations     TournamentParticipant[]
+  matchesAsPlayer1   Match[]                 @relation("Player1Matches")
+  matchesAsPlayer2   Match[]                 @relation("Player2Matches")
+  reportedMatches    Match[]                 @relation("ReportedMatches")
+
+  @@map("users")
+}
+
+model Tournament {
+  id           String   @id @default(cuid())
+  name         String
+  description  String?
+  format       String   // "swiss" | "round_robin" | "single_elimination"
+  category     String   @default("esports") // "esports" | "sports" | "tcg" | "chess" | "general"
+  status       String   @default("pending") // "pending" | "ongoing" | "playoff" | "completed"
+  topCut       Int      @default(4) // 晉級複賽人數 (如前 4 名或 8 名)
+  currentRound Int      @default(0)
+  totalRounds  Int      @default(3) // 預設輪次 (瑞士制或小組賽)
+  createdBy    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  creator      User                    @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  participants TournamentParticipant[]
+  matches      Match[]
+
+  @@map("tournaments")
+}
+
+model TournamentParticipant {
+  id            String   @id @default(cuid())
+  tournamentId  String
+  userId        String
+  seed          Int      @default(0)
+  currentScore  Float    @default(0.0) // 勝=1分, 和=0.5分, 負=0分
+  tieBreakScore Float    @default(0.0) // 輔分 (Buchholz 等輔助計分)
+  groupName     String?  // 用於小組賽分組 (例: "Group A", "Group B")
+  isDisqualified Boolean @default(false)
+  createdAt     DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, userId])
+  @@map("tournament_participants")
+}
+
+model Match {
+  id              String    @id @default(cuid())
+  tournamentId    String
+  round           Int
+  stage           String    @default("preliminary") // "preliminary" | "playoff"
+  groupName       String?   // 小組賽時的小組標籤
+  bracketPosition Int?      // 淘汰賽樹狀圖對應節點位置編號
+  player1Id       String
+  player2Id       String?   // 可為 null，代表輪空 (BYE)
+  player1Result   String?   // "win" | "loss" | "draw"
+  player2Result   String?   // "win" | "loss" | "draw"
+  status          String    @default("pending") // "pending" | "finished"
+  reportedBy      String?   // 登記該對局結果的 userId 或 "ADMIN"
+  reportedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player1    User       @relation("Player1Matches", fields: [player1Id], references: [id], onDelete: Cascade)
+  player2    User?      @relation("Player2Matches", fields: [player2Id], references: [id], onDelete: Cascade)
+  reporter   User?      @relation("ReportedMatches", fields: [reportedBy], references: [id], onDelete: SetNull)
+
+  @@map("matches")
+}
+

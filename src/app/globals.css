@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #06080e;
+  --foreground: #f1f5f9;
+}
+
+body {
+  color: var(--foreground);
+  background-color: var(--background);
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255, 32, 78, 0.12), transparent 70%),
+    radial-gradient(circle at 85% 85%, rgba(0, 240, 255, 0.06), transparent 50%);
+  min-height: 100vh;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #202b44;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}
+
+@layer utilities {
+  /* Persona / Cyber Slanted Cut Polygon */
+  .cyber-cut-corner {
+    clip-path: polygon(
+      0 0, 
+      calc(100% - 12px) 0, 
+      100% 12px, 
+      100% 100%, 
+      12px 100%, 
+      0 calc(100% - 12px)
+    );
+  }
+
+  .cyber-cut-br {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+  }
+
+  .cyber-cut-tl {
+    clip-path: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+  }
+
+  .cyber-skew-btn {
+    transform: skewX(-12deg);
+    display: inline-block;
+  }
+
+  .cyber-skew-content {
+    transform: skewX(12deg);
+    display: inline-block;
+  }
+
+  /* Text and element glow effects */
+  .text-glow-red {
+    text-shadow: 0 0 12px rgba(255, 32, 78, 0.7), 0 0 24px rgba(255, 32, 78, 0.4);
+  }
+
+  .text-glow-cyan {
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.7), 0 0 24px rgba(0, 240, 255, 0.4);
+  }
+
+  .text-glow-gold {
+    text-shadow: 0 0 12px rgba(245, 158, 11, 0.7), 0 0 24px rgba(245, 158, 11, 0.4);
+  }
+
+  /* Grid overlay */
+  .bg-grid-tech {
+    background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  }
+
+  /* Dynamic gaming badge */
+  .badge-p5-win {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  }
+
+  .badge-p5-loss {
+    background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  }
+
+  .badge-p5-draw {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+    box-shadow: 0 0 10px rgba(100, 116, 139, 0.3);
+  }
+}
+
