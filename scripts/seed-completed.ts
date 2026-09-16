@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../src/lib/prisma";
 import { hashPassword } from "../src/lib/auth";
 import { recalculateTournamentScores } from "../src/lib/tournament/matchService";
 
-const prisma = new PrismaClient();
 
 async function seedCompleted() {
   console.log("== Seeding Multi-Discipline Showcase Tournaments ==");
