@@ -59,13 +59,21 @@ export interface BattleFighter {
 
 export interface BattleStep {
   step: number;
-  type: "ENTRY" | "BUFF" | "CLASH" | "DAMAGE" | "FINISH";
+  round?: number;
+  type: "ENTRY" | "ROUND_1" | "SHIELD_ROUND_2" | "ULTIMATE_ROUND_3" | "BUFF" | "CLASH" | "DAMAGE" | "FINISH";
   title: string;
   desc: string;
   shake?: boolean;
   attacker?: "A" | "B" | "BOTH";
   damageToA?: number;
   damageToB?: number;
+  shieldAbsorbA?: number;
+  shieldAbsorbB?: number;
+  hpAfterA?: number;
+  hpAfterB?: number;
+  skillNameA?: string;
+  skillNameB?: string;
+  actionText?: string;
 }
 
 export interface BattleLog {

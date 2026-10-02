@@ -117,4 +117,34 @@ body {
   .animate-dash-right {
     animation: dashRight 0.75s ease-in-out;
   }
+
+  @keyframes skillPop {
+    0% { transform: scale(0.6) translateY(20px); opacity: 0; }
+    30% { transform: scale(1.15) translateY(-5px); opacity: 1; }
+    80% { transform: scale(1.05) translateY(-2px); opacity: 1; }
+    100% { transform: scale(0.9) translateY(-15px); opacity: 0; }
+  }
+
+  @keyframes shieldAbsorb {
+    0% { transform: scale(1); box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+    50% { transform: scale(1.3); box-shadow: 0 0 35px rgba(245, 158, 11, 1), 0 0 20px rgba(56, 189, 248, 1); }
+    100% { transform: scale(1); box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+  }
+
+  @keyframes cheerSpark {
+    0% { transform: translateY(0) scale(0.6); opacity: 1; }
+    100% { transform: translateY(-60px) scale(1.4); opacity: 0; }
+  }
+
+  .animate-skill-pop {
+    animation: skillPop 1.6s ease-out forwards;
+  }
+
+  .animate-shield-absorb {
+    animation: shieldAbsorb 0.8s ease-in-out;
+  }
+
+  .animate-cheer-spark {
+    animation: cheerSpark 0.9s ease-out forwards;
+  }
 }
