@@ -72,11 +72,11 @@ function createPrismaClient(): PrismaClient {
 }
 
 export function getPrismaClient(): PrismaClient {
-  if (globalForPrisma.prisma && (globalForPrisma.prisma as any).user) {
+  if (globalForPrisma.prisma && (globalForPrisma.prisma as any).student) {
     return globalForPrisma.prisma;
   }
   const client = createPrismaClient();
-  if ((client as any).user) {
+  if ((client as any).student) {
     globalForPrisma.prisma = client;
   }
   return client;
