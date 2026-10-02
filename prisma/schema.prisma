@@ -11,91 +11,99 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id           String   @id @default(cuid())
-  studentId    String   @unique
-  name         String
-  nickname     String
-  role         String   @default("player") // "admin" | "player"
-  passwordHash String
-  avatar       String   @default("cyber-fox")
-  motto        String?  @default("超越極限，榮耀加冕！")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  createdTournaments Tournament[]            @relation("TournamentCreator")
-  participations     TournamentParticipant[]
-  matchesAsPlayer1   Match[]                 @relation("Player1Matches")
-  matchesAsPlayer2   Match[]                 @relation("Player2Matches")
-  reportedMatches    Match[]                 @relation("ReportedMatches")
-
-  @@map("users")
-}
-
-model Tournament {
-  id           String   @id @default(cuid())
-  name         String
-  description  String?
-  format       String   // "swiss" | "round_robin" | "single_elimination"
-  category     String   @default("esports") // "esports" | "sports" | "tcg" | "chess" | "general"
-  status       String   @default("pending") // "pending" | "ongoing" | "playoff" | "completed"
-  topCut       Int      @default(4) // 晉級複賽人數 (如前 4 名或 8 名)
-  currentRound Int      @default(0)
-  totalRounds  Int      @default(3) // 預設輪次 (瑞士制或小組賽)
-  createdBy    String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  creator      User                    @relation("TournamentCreator", fields: [createdBy], references: [id], onDelete: Cascade)
-  participants TournamentParticipant[]
-  matches      Match[]
-
-  @@map("tournaments")
-}
-
-model TournamentParticipant {
+// 1. 學生資料表 (學號唯一約束、姓名、家長電話、外觀ID、勝負平統計)
+model Student {
   id            String   @id @default(cuid())
-  tournamentId  String
-  userId        String
-  seed          Int      @default(0)
-  currentScore  Float    @default(0.0) // 勝=1分, 和=0.5分, 負=0分
-  tieBreakScore Float    @default(0.0) // 輔分 (Buchholz 等輔助計分)
-  groupName     String?  // 用於小組賽分組 (例: "Group A", "Group B")
-  isDisqualified Boolean @default(false)
+  studentNumber String   @unique // 學號 (例：S101)
+  name          String   // 學生真實姓名
+  parentPhone   String?  // 家長聯絡電話
+  avatarId      String   @default("pixel-knight") // 2D 像素外觀 ID (pixel-knight, pixel-mage, pixel-ninja, pixel-archer...)
+  wins          Int      @default(0) // 勝場數
+  losses        Int      @default(0) // 敗場數
+  draws         Int      @default(0) // 平手數
   createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeworkRecords HomeworkRecord[]
+  examScores      ExamScore[]
+  matchesAsA      BattleMatch[]    @relation("PlayerAMatches")
+  matchesAsB      BattleMatch[]    @relation("PlayerBMatches")
+  wonMatches      BattleMatch[]    @relation("WonMatches")
 
-  @@unique([tournamentId, userId])
-  @@map("tournament_participants")
+  @@map("students")
 }
 
-model Match {
-  id              String    @id @default(cuid())
-  tournamentId    String
-  round           Int
-  stage           String    @default("preliminary") // "preliminary" | "playoff"
-  groupName       String?   // 小組賽時的小組標籤
-  bracketPosition Int?      // 淘汰賽樹狀圖對應節點位置編號
-  player1Id       String
-  player2Id       String?   // 可為 null，代表輪空 (BYE)
-  player1Result   String?   // "win" | "loss" | "draw"
-  player2Result   String?   // "win" | "loss" | "draw"
-  status          String    @default("pending") // "pending" | "finished"
-  player1Slots    String?   // JSON array string of available time slot IDs for player 1
-  player2Slots    String?   // JSON array string of available time slot IDs for player 2
-  scheduledTime   String?   // Confirmed agreed match time description
-  reportedBy      String?   // 登記該對局結果的 userId 或 "ADMIN"
-  reportedAt      DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+// 2. 週次資料表 (週次編號、單元名稱、補交期限文字、是否已結算)
+model AcademicWeek {
+  id          String   @id @default(cuid())
+  weekNumber  Int      @unique // 週次編號 (例：1, 2, 3...)
+  title       String   // 當週單元名稱 (例：分數的除法與四則運算)
+  deadline    String   // 補交期限文字 (例：本週五 18:00 前)
+  isSettled   Boolean  @default(false) // 是否已完成對戰結算
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  player1    User       @relation("Player1Matches", fields: [player1Id], references: [id], onDelete: Cascade)
-  player2    User?      @relation("Player2Matches", fields: [player2Id], references: [id], onDelete: Cascade)
-  reporter   User?      @relation("ReportedMatches", fields: [reportedBy], references: [id], onDelete: SetNull)
+  homeworkRecords HomeworkRecord[]
+  examScores      ExamScore[]
+  battleMatches   BattleMatch[]
 
-  @@map("matches")
+  @@map("academic_weeks")
 }
 
+// 3. 作業登記資料表 (週次、學生、狀態、缺交範圍、Buff標記)
+model HomeworkRecord {
+  id           String       @id @default(cuid())
+  weekId       String
+  studentId    String
+  status       String       @default("completed") // "completed" | "missing" | "partial"
+  missingScope String?      // 缺交範圍文字 (例：數習 P.32-P.35)
+  hasBuff      Boolean      @default(true) // 是否獲得戰力護盾 (+5 分)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  week         AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, studentId])
+  @@map("homework_records")
+}
+
+// 4. 週考成績資料表 (週次、學生、原始成績、最終有效戰力)
+model ExamScore {
+  id             String       @id @default(cuid())
+  weekId         String
+  studentId      String
+  rawScore       Float        // 考試原始卷面成績
+  effectivePower Float        // 最終有效戰力 = rawScore + (hasBuff ? 5 : 0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  week           AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([weekId, studentId])
+  @@map("exam_scores")
+}
+
+// 5. 對戰配對資料表 (週次、玩家A、玩家B/替身機器人、勝負平、戰鬥腳本JSON)
+model BattleMatch {
+  id         String       @id @default(cuid())
+  weekId     String
+  playerAId  String
+  playerBId  String?      // 可為 null (若為替身機器人)
+  botName    String?      // 替身機器人名稱 (例：分段守門員 Alpha)
+  botPower   Float?       // 替身機器人有效戰力
+  botAvatar  String?      // 替身機器人外觀 ID
+  winnerId   String?      // 獲勝學生 ID (平手或機器人獲勝則可特殊記錄)
+  isDraw     Boolean      @default(false) // 是否平手
+  battleLog  String       // 戰鬥腳本 JSON 字串 (包含 Buff 觸發、衝撞位移、扣血數值、結算結果)
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  week       AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  playerA    Student      @relation("PlayerAMatches", fields: [playerAId], references: [id], onDelete: Cascade)
+  playerB    Student?     @relation("PlayerBMatches", fields: [playerBId], references: [id], onDelete: SetNull)
+  winner     Student?     @relation("WonMatches", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  @@map("battle_matches")
+}
