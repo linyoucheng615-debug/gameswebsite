@@ -167,6 +167,14 @@ export default function StudentLobbyPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* 親師生透明整合看板入口 */}
+          <Link
+            href={`/portal/${studentNumber}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black transition-all shadow-sm active:scale-95 cursor-pointer"
+          >
+            <span>📊 親師生整合看板</span>
+          </Link>
+
           {/* 角色更衣室按鈕 */}
           <Link
             href={`/student/${studentNumber}/character`}

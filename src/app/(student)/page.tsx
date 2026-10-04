@@ -17,12 +17,12 @@ export default function StudentHomePage() {
       return;
     }
     setErrorMsg(null);
-    router.push(`/student/${trimmed}`);
+    router.push(`/portal/${trimmed}`);
   }
 
   function handleQuickSelect(num: string) {
     setStudentNumber(num);
-    router.push(`/student/${num}`);
+    router.push(`/portal/${num}`);
   }
 
   return (

@@ -42,9 +42,70 @@ export interface ExamScore {
   weekId: string;
   studentId: string;
   rawScore: number;
+  chineseScore: number;
+  englishScore: number;
+  mathScore: number;
+  averageScore: number;
+  previousAverage: number;
   effectivePower: number;
   student?: Student;
   week?: AcademicWeek;
+}
+
+export interface WeeklyChallenge {
+  id: string;
+  weekId: string;
+  subject: "CHINESE" | "ENGLISH" | "MATH";
+  questionText: string;
+  options: string[];
+  correctAnswer: string;
+  explanation?: string | null;
+  createdAt?: string;
+}
+
+export interface StudentChallengeAnswer {
+  id: string;
+  studentId: string;
+  challengeId: string;
+  isCorrect: boolean;
+  answeredAt?: string;
+}
+
+export interface PortalData {
+  student: Student;
+  currentWeek: AcademicWeek;
+  currentHomework: HomeworkRecord | null;
+  currentScore: ExamScore | null;
+  stats: {
+    wins: number;
+    losses: number;
+    draws: number;
+    winRate: number;
+  };
+  chartData: {
+    weekNumber: number;
+    weekTitle: string;
+    chinese: number;
+    english: number;
+    math: number;
+    average: number;
+    classAverage: number;
+    homeworkStatus: HomeworkStatus;
+  }[];
+  challenges: {
+    id: string;
+    subject: "CHINESE" | "ENGLISH" | "MATH";
+    questionText: string;
+    options: string[];
+    explanation?: string | null;
+    userAnswer?: {
+      isCorrect: boolean;
+    } | null;
+  }[];
+  allChallengesCorrect: boolean;
+  hasUltimate: boolean;
+  ultimateReason: string;
+  match: any | null;
 }
 
 export interface BattleFighter {
@@ -53,20 +114,37 @@ export interface BattleFighter {
   name: string;
   avatarId: string;
   rawScore: number;
-  buff: number; // 5 if completed, 0 if missing/partial
+  chineseScore?: number;
+  englishScore?: number;
+  mathScore?: number;
+  averageScore?: number;
+  previousAverage?: number;
+  buff: number; // 10 if completed, 0 if missing/partial
+  challengeBonus?: number; // 15 if all 3 challenges correct
+  growthBonus?: number; // improvement * 1.5
   effectivePower: number;
   initialHp: number;
   finalHp: number;
+  hasUltimate?: boolean;
+  ultimateReason?: string;
+  highestSubject?: "CHINESE" | "ENGLISH" | "MATH";
+  highestSkillName?: string;
   isBot?: boolean;
+  skin?: {
+    gender: "boy" | "girl";
+    charClass: "warrior" | "mage" | "ranger" | "assassin";
+    color: "blue" | "red" | "green" | "purple" | "gold";
+  };
 }
 
 export interface BattleStep {
   step: number;
   round?: number;
-  type: "ENTRY" | "ROUND_1" | "SHIELD_ROUND_2" | "ULTIMATE_ROUND_3" | "BUFF" | "CLASH" | "DAMAGE" | "FINISH";
+  type: "ENTRY" | "ROUND_1" | "ROUND_2_SKILL" | "ROUND_3_ULTIMATE" | "SHIELD_ROUND_2" | "ULTIMATE_ROUND_3" | "BUFF" | "CLASH" | "DAMAGE" | "FINISH";
   title: string;
   desc: string;
   shake?: boolean;
+  superFlash?: boolean;
   attacker?: "A" | "B" | "BOTH";
   damageToA?: number;
   damageToB?: number;
@@ -89,6 +167,10 @@ export interface BattleLog {
   winner: "A" | "B" | "DRAW";
   winnerName: string;
   summary: string;
+  causalityAnalysis?: {
+    reasonForA: string;
+    reasonForB: string;
+  };
   steps: BattleStep[];
 }
 

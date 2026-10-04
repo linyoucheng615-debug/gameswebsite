@@ -34,6 +34,7 @@ model Student {
   wonMatches      BattleMatch[]    @relation("WonMatches")
   expCoin         StudentExpCoin?
   strategies      StudentStrategy[]
+  challengeAnswers StudentChallengeAnswer[]
 
   @@map("students")
 }
@@ -52,6 +53,7 @@ model AcademicWeek {
   examScores      ExamScore[]
   battleMatches   BattleMatch[]
   strategies      StudentStrategy[]
+  challenges      WeeklyChallenge[]
 
   @@map("academic_weeks")
 }
@@ -74,18 +76,23 @@ model HomeworkRecord {
   @@map("homework_records")
 }
 
-// 4. 週考成績資料表 (週次、學生、原始成績、最終有效戰力)
+// 4. 週考成績資料表 (週次、學生、國英數原始成績、平均、進步幅度、最終有效戰力)
 model ExamScore {
-  id             String       @id @default(cuid())
-  weekId         String
-  studentId      String
-  rawScore       Float        // 考試原始卷面成績
-  effectivePower Float        // 最終有效戰力 = rawScore + (hasBuff ? 5 : 0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  weekId          String
+  studentId       String
+  rawScore        Float        // 考試原始卷面成績
+  chineseScore    Float        @default(0) // 國文成績
+  englishScore    Float        @default(0) // 英文成績
+  mathScore       Float        @default(0) // 數學成績
+  averageScore    Float        @default(0) // (國+英+數)/3
+  previousAverage Float        @default(0) // 過去平均，用於判定「進步」
+  effectivePower  Float        // 最終有效戰力
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  week           AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
-  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  week            AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  student         Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([weekId, studentId])
   @@map("exam_scores")
@@ -160,5 +167,37 @@ model StudentStrategy {
 
   @@unique([studentId, weekId])
   @@map("student_strategies")
+}
+
+// 9. 每週作業錯題挑戰題庫 (每週國英數 3 題錯題挑戰)
+model WeeklyChallenge {
+  id            String   @id @default(cuid())
+  weekId        String
+  subject       String   // 'CHINESE' | 'ENGLISH' | 'MATH'
+  questionText  String
+  options       String   // 4 個選項 JSON 字串 ["A", "B", "C", "D"]
+  correctAnswer String   // 正確選項
+  explanation   String?  // 簡短錯題解析
+  createdAt     DateTime @default(now())
+
+  week          AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  answers       StudentChallengeAnswer[]
+
+  @@map("weekly_challenges")
+}
+
+// 10. 學生挑戰題作答紀錄
+model StudentChallengeAnswer {
+  id          String   @id @default(cuid())
+  studentId   String
+  challengeId String
+  isCorrect   Boolean
+  answeredAt  DateTime @default(now())
+
+  student     Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  challenge   WeeklyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, challengeId])
+  @@map("student_challenge_answers")
 }
 

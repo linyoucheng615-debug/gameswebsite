@@ -89,6 +89,18 @@ export default function AdminLayout({
                 </Link>
 
                 <Link
+                  href="/admin/challenges"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                    pathname.startsWith("/admin/challenges")
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>錯題挑戰題庫</span>
+                </Link>
+
+                <Link
                   href="/admin/words"
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                     pathname.startsWith("/admin/words")

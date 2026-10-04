@@ -88,43 +88,43 @@ export default function AdminSettlePage() {
     fetchSettleData();
   }, [selectedWeekId]);
 
-  // 載入 30 人模擬成績
+  // 載入 30 人國英數模擬成績
   function handleLoadSampleScores() {
-    const sampleScores: Record<string, number> = {
-      S101: 96,
-      S102: 95,
-      S103: 92,
-      S104: 88, // 缺交作業 (+0)
-      S105: 89,
-      S106: 87,
-      S107: 86,
-      S108: 84,
-      S109: 83, // 需訂正 (+0)
-      S110: 85,
-      S111: 82,
-      S112: 80,
-      S113: 81,
-      S114: 79,
-      S115: 78,
-      S116: 77,
-      S117: 76,
-      S118: 75, // 缺交 (+0)
-      S119: 75,
-      S120: 74,
-      S121: 73,
-      S122: 72, // 部分 (+0)
-      S123: 71,
-      S124: 70,
-      S125: 69,
-      S126: 68,
-      S127: 67, // 缺交 (+0)
-      S128: 66,
-      S129: 65,
-      S130: 64,
+    const sampleScores: Record<string, [number, number, number]> = {
+      S101: [96, 98, 95],
+      S102: [94, 96, 95],
+      S103: [92, 90, 94],
+      S104: [88, 86, 90], // 缺交作業 (+0)
+      S105: [89, 92, 86],
+      S106: [87, 88, 86],
+      S107: [86, 85, 87],
+      S108: [84, 82, 86],
+      S109: [83, 85, 81], // 需訂正 (+0)
+      S110: [85, 84, 86],
+      S111: [82, 80, 84],
+      S112: [80, 82, 78],
+      S113: [81, 79, 83],
+      S114: [79, 81, 77],
+      S115: [78, 80, 76],
+      S116: [77, 75, 79],
+      S117: [76, 78, 74],
+      S118: [75, 73, 77], // 缺交 (+0)
+      S119: [75, 76, 74],
+      S120: [74, 72, 76],
+      S121: [73, 75, 71],
+      S122: [72, 70, 74], // 部分 (+0)
+      S123: [71, 73, 69],
+      S124: [70, 68, 72],
+      S125: [69, 71, 67],
+      S126: [68, 66, 70],
+      S127: [67, 69, 65], // 缺交 (+0)
+      S128: [66, 64, 68],
+      S129: [65, 67, 63],
+      S130: [64, 62, 66],
     };
 
     const lines = Object.entries(sampleScores)
-      .map(([sNum, score]) => `${sNum} ${score}`)
+      .map(([sNum, [c, e, m]]) => `${sNum} ${c} ${e} ${m}`)
       .join("\n");
 
     setScoresText(lines);
@@ -247,7 +247,7 @@ export default function AdminSettlePage() {
             </div>
 
             <p className="text-[11px] text-slate-500">
-              支援「學號 成績」或 CSV 格式貼上（例如：<code className="text-indigo-600 bg-slate-100 px-1 py-0.5 rounded font-mono">S101 95</code>）：
+              支援「學號 國文 英文 數學」或「學號 單科」或 CSV 格式（例：<code className="text-indigo-600 bg-slate-100 px-1 py-0.5 rounded font-mono">S101 92 95 90</code>）：
             </p>
 
             <textarea
@@ -255,13 +255,13 @@ export default function AdminSettlePage() {
               rows={13}
               value={scoresText}
               onChange={(e) => setScoresText(e.target.value)}
-              placeholder="S101 96&#10;S102 95&#10;S103 92&#10;S104 88&#10;..."
+              placeholder="S101 96 98 95&#10;S102 94 96 95&#10;S103 92 90 94&#10;..."
               className="w-full bg-slate-50 border border-slate-300 text-slate-800 font-mono text-xs p-3 rounded-md focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
             />
 
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
               <div className="text-[11px] text-slate-500">
-                作業完成者自動獲 <strong className="text-emerald-700 font-semibold">+5 護盾</strong>
+                作業完成 <strong className="text-emerald-700 font-semibold">+10 護盾</strong> / 錯題全對 <strong className="text-amber-600 font-semibold">+15 奧義</strong>
               </div>
 
               <button
@@ -282,10 +282,10 @@ export default function AdminSettlePage() {
               <Shield className="w-3.5 h-3.5 text-indigo-600" />
               <span>演算法規則：</span>
             </div>
-            <p>1. 最終戰力 = 卷面原始分 + (作業完成 ? 5 : 0)。</p>
+            <p>1. 基礎血量 = 週考三科平均成績；有效戰力 = 三科平均 + (作業準時 ? 10 : 0) + (錯題全對 ? 15 : 0) + (進步幅度 * 1.5)。</p>
             <p>2. 嚴格由高至低排序，相鄰成對（1v2, 3v4 ...）。</p>
             <p>3. 奇數人數自動生成同分段平均戰力「守門機器人」。</p>
-            <p>4. 比較戰力判定勝負，基礎 20 點傷害加權線性放大並寫入 battle_log。</p>
+            <p>4. 35 秒 3 回合演繹：普攻試探 ➔ 學科絕技 ➔ 逆轉奧義 Super Flash (-50 暴擊)。</p>
           </div>
         </div>
 

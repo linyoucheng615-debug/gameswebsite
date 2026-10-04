@@ -5,9 +5,16 @@ import { pairAndGenerateMatches, StudentInputScore } from "@/lib/battleEngine";
 
 export const dynamic = "force-dynamic";
 
-// 解析文字輸入 (支援「學號 成績」、「學號,成績」或 CSV)
-function parseScoresInput(rawText: string): Map<string, number> {
-  const result = new Map<string, number>();
+interface ParsedScoreEntry {
+  chinese: number;
+  english: number;
+  math: number;
+  average: number;
+}
+
+// 解析文字輸入 (支援「學號 國文 英文 數學」或「學號 成績」或 CSV)
+function parseScoresInput(rawText: string): Map<string, ParsedScoreEntry> {
+  const result = new Map<string, ParsedScoreEntry>();
   const lines = rawText.split(/\r?\n/);
 
   for (const line of lines) {
@@ -16,11 +23,27 @@ function parseScoresInput(rawText: string): Map<string, number> {
 
     // 匹配常見分隔符：逗號、Tab、空格、冒號
     const parts = trimmed.split(/[\t,:\s]+/).filter(Boolean);
-    if (parts.length >= 2) {
+    if (parts.length >= 4) {
+      // 學號 國 英 數
+      const studentNum = parts[0].trim().toUpperCase();
+      const c = parseFloat(parts[1]);
+      const e = parseFloat(parts[2]);
+      const m = parseFloat(parts[3]);
+      if (!isNaN(c) && !isNaN(e) && !isNaN(m)) {
+        const avg = Math.round(((c + e + m) / 3) * 10) / 10;
+        result.set(studentNum, { chinese: c, english: e, math: m, average: avg });
+      }
+    } else if (parts.length >= 2) {
+      // 學號 單一成績 (國英數皆採用此分)
       const studentNum = parts[0].trim().toUpperCase();
       const scoreVal = parseFloat(parts[1]);
       if (!isNaN(scoreVal)) {
-        result.set(studentNum, scoreVal);
+        result.set(studentNum, {
+          chinese: scoreVal,
+          english: scoreVal,
+          math: scoreVal,
+          average: scoreVal,
+        });
       }
     }
   }
@@ -53,6 +76,13 @@ export async function GET(req: NextRequest) {
         examScores: {
           where: { weekId: targetWeek.id },
         },
+        challengeAnswers: {
+          where: {
+            challenge: {
+              weekId: targetWeek.id,
+            },
+          },
+        },
       },
     });
 
@@ -67,16 +97,28 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       week: targetWeek,
-      students: students.map((s) => ({
-        id: s.id,
-        studentNumber: s.studentNumber,
-        name: s.name,
-        avatarId: s.avatarId,
-        hasBuff: s.homeworkRecords[0]?.hasBuff ?? true,
-        homeworkStatus: s.homeworkRecords[0]?.status ?? "completed",
-        existingScore: s.examScores[0]?.rawScore ?? null,
-        existingPower: s.examScores[0]?.effectivePower ?? null,
-      })),
+      students: students.map((s) => {
+        const scoreRec = s.examScores[0];
+        const answers = s.challengeAnswers || [];
+        const allCorrect = answers.length >= 3 && answers.every((a) => a.isCorrect);
+
+        return {
+          id: s.id,
+          studentNumber: s.studentNumber,
+          name: s.name,
+          avatarId: s.avatarId,
+          hasBuff: s.homeworkRecords[0]?.hasBuff ?? true,
+          homeworkStatus: s.homeworkRecords[0]?.status ?? "completed",
+          existingScore: scoreRec?.rawScore ?? null,
+          chineseScore: scoreRec?.chineseScore ?? null,
+          englishScore: scoreRec?.englishScore ?? null,
+          mathScore: scoreRec?.mathScore ?? null,
+          averageScore: scoreRec?.averageScore ?? null,
+          previousAverage: scoreRec?.previousAverage ?? null,
+          existingPower: scoreRec?.effectivePower ?? null,
+          allChallengesCorrect: allCorrect,
+        };
+      }),
       matches: matches.map((m) => ({
         id: m.id,
         playerA: m.playerA,
@@ -117,28 +159,49 @@ export async function POST(req: NextRequest) {
     }
 
     // 解析成績
-    const scoreMap = new Map<string, number>();
+    const scoreMap = new Map<string, ParsedScoreEntry>();
     if (scoresText && typeof scoresText === "string") {
       const parsed = parseScoresInput(scoresText);
       parsed.forEach((val, key) => scoreMap.set(key, val));
     }
     if (Array.isArray(directScores)) {
       for (const item of directScores) {
-        if (item.studentNumber && typeof item.rawScore === "number") {
-          scoreMap.set(item.studentNumber.toUpperCase(), item.rawScore);
+        if (item.studentNumber) {
+          const sNum = item.studentNumber.toUpperCase();
+          const c = typeof item.chineseScore === "number" ? item.chineseScore : (item.rawScore ?? 75);
+          const e = typeof item.englishScore === "number" ? item.englishScore : (item.rawScore ?? 75);
+          const m = typeof item.mathScore === "number" ? item.mathScore : (item.rawScore ?? 75);
+          const avg = Math.round(((c + e + m) / 3) * 10) / 10;
+          scoreMap.set(sNum, { chinese: c, english: e, math: m, average: avg });
         }
       }
     }
 
     if (scoreMap.size === 0) {
-      return NextResponse.json({ error: "未偵測到任何有效成績，請輸入「學號 成績」" }, { status: 400 });
+      return NextResponse.json({ error: "未偵測到任何有效成績，請輸入「學號 國文 英文 數學」或「學號 成績」" }, { status: 400 });
     }
 
-    // 取得所有學生與當週作業記錄
+    // 取得所有學生與當週作業記錄、挑戰作答紀錄、以及歷史平均成績
     const allStudents = await prisma.student.findMany({
       include: {
         homeworkRecords: {
           where: { weekId: week.id },
+        },
+        examScores: {
+          where: {
+            week: {
+              weekNumber: { lt: week.weekNumber },
+            },
+          },
+          orderBy: { week: { weekNumber: "desc" } },
+          take: 3,
+        },
+        challengeAnswers: {
+          where: {
+            challenge: {
+              weekId: week.id,
+            },
+          },
         },
       },
     });
@@ -150,18 +213,43 @@ export async function POST(req: NextRequest) {
     for (const student of allStudents) {
       const sNum = student.studentNumber.toUpperCase();
       if (scoreMap.has(sNum)) {
-        const rawScore = scoreMap.get(sNum)!;
+        const parsedEntry = scoreMap.get(sNum)!;
         const hwRecord = student.homeworkRecords[0];
-        // 作業已完成才有護盾 (+5 分)，缺交或部分完成為 +0
+        // 作業已完成才有護盾 (+10 戰力)
         const hasHomeworkBuff = hwRecord ? hwRecord.hasBuff : true;
+
+        // 計算過去平均 (最多過去 3 週)
+        const prevScores = student.examScores;
+        let pastAvg = 0;
+        if (prevScores.length > 0) {
+          const sum = prevScores.reduce((acc, curr) => acc + (curr.averageScore || curr.rawScore), 0);
+          pastAvg = Math.round((sum / prevScores.length) * 10) / 10;
+        } else {
+          pastAvg = parsedEntry.average;
+        }
+
+        // 作業三題挑戰是否全對
+        const answers = student.challengeAnswers;
+        const allCorrect = answers.length >= 3 && answers.every((a) => a.isCorrect);
 
         inputScores.push({
           studentNumber: student.studentNumber,
           name: student.name,
           avatarId: student.avatarId,
           studentId: student.id,
-          rawScore,
+          rawScore: parsedEntry.average,
+          chineseScore: parsedEntry.chinese,
+          englishScore: parsedEntry.english,
+          mathScore: parsedEntry.math,
+          averageScore: parsedEntry.average,
+          previousAverage: pastAvg,
           hasHomeworkBuff,
+          allChallengesCorrect: allCorrect,
+          skin: {
+            gender: (student.skinGender as any) || "boy",
+            charClass: (student.skinClass as any) || "warrior",
+            color: (student.skinColor as any) || "blue",
+          },
         });
       } else {
         missingInBatch.push(student.studentNumber);
@@ -177,9 +265,15 @@ export async function POST(req: NextRequest) {
 
     // 資料庫交易寫入：更新成績、儲存對戰記錄、標記已結算
     await prisma.$transaction(async (tx) => {
-      // 1. 寫入或更新成績
+      // 1. 寫入或更新成績 (包含國英數三科成績、平均、進步幅度、有效戰力)
       for (const item of inputScores) {
-        const effectivePower = item.rawScore + (item.hasHomeworkBuff ? 5 : 0);
+        // 從 pair 中找到該學生算出的 effectivePower
+        const fighter = pairs
+          .flatMap((p) => [p.playerA, p.playerB])
+          .find((f) => f.id === item.studentId);
+
+        const effPower = fighter ? fighter.effectivePower : item.rawScore;
+
         await tx.examScore.upsert({
           where: {
             weekId_studentId: {
@@ -189,13 +283,23 @@ export async function POST(req: NextRequest) {
           },
           update: {
             rawScore: item.rawScore,
-            effectivePower,
+            chineseScore: item.chineseScore ?? item.rawScore,
+            englishScore: item.englishScore ?? item.rawScore,
+            mathScore: item.mathScore ?? item.rawScore,
+            averageScore: item.averageScore ?? item.rawScore,
+            previousAverage: item.previousAverage ?? item.rawScore,
+            effectivePower: effPower,
           },
           create: {
             weekId: week.id,
             studentId: item.studentId,
             rawScore: item.rawScore,
-            effectivePower,
+            chineseScore: item.chineseScore ?? item.rawScore,
+            englishScore: item.englishScore ?? item.rawScore,
+            mathScore: item.mathScore ?? item.rawScore,
+            averageScore: item.averageScore ?? item.rawScore,
+            previousAverage: item.previousAverage ?? item.rawScore,
+            effectivePower: effPower,
           },
         });
       }
@@ -280,6 +384,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("POST /api/admin/settle error:", error);
-    return NextResponse.json({ error: "對戰結算失敗: " + (error?.message || "未知錯誤") }, { status: 500 });
+    return NextResponse.json({ error: error.message || "成績結算失敗" }, { status: 500 });
   }
 }
