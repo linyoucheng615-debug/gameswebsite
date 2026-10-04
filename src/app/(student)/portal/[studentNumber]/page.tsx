@@ -186,34 +186,54 @@ export default function StudentPortalPage() {
   const prevAvg = examScore?.previousAverage ?? 75;
   const avgDiff = Math.round((avgScore - prevAvg) * 10) / 10;
 
-  // 計算每個晶片的解鎖進度與差距幅度
+  const mathP85 = data.p85Thresholds?.math ?? 85;
+  const chineseP85 = data.p85Thresholds?.chinese ?? 85;
+  const englishP85 = data.p85Thresholds?.english ?? 85;
+  const isExcused = !!data.isExcused;
+
+  // 計算每個晶片的解鎖進度與差距幅度 (支援絕對分數 ≥ 85 或 PR ≥ 85 前 15% 雙軌判定)
   function getChipProgress(chipId: string) {
     switch (chipId) {
       case "MATH_VOID": {
-        const percent = Math.min(100, Math.round((mathScore / 85) * 100));
-        const diff = Math.max(0, 85 - mathScore);
-        const unlocked = mathScore >= 85;
+        const isAbsolute = mathScore >= 85;
+        const isTop15 = mathScore >= mathP85;
+        const unlocked = isAbsolute || isTop15;
+        const target = Math.min(85, mathP85);
+        const percent = unlocked ? 100 : Math.min(100, Math.round((mathScore / target) * 100));
+        const diff = Math.max(0, target - mathScore);
         const text = unlocked
-          ? `✔ 已達標 (目前 ${mathScore} 分)`
-          : `數學目前 ${mathScore} 分，還差 ${diff} 分達標`;
+          ? isTop15 && !isAbsolute
+            ? "🏆 榮登班級前 15% 解鎖"
+            : `✔ 已達標 (目前 ${mathScore} 分)`
+          : `數學目前 ${mathScore} 分，還差 ${diff} 分達標 (需 ≥85 或前15%門檻 ${mathP85}分)`;
         return { percent, text, unlocked };
       }
       case "CHINESE_INK": {
-        const percent = Math.min(100, Math.round((chineseScore / 85) * 100));
-        const diff = Math.max(0, 85 - chineseScore);
-        const unlocked = chineseScore >= 85;
+        const isAbsolute = chineseScore >= 85;
+        const isTop15 = chineseScore >= chineseP85;
+        const unlocked = isAbsolute || isTop15;
+        const target = Math.min(85, chineseP85);
+        const percent = unlocked ? 100 : Math.min(100, Math.round((chineseScore / target) * 100));
+        const diff = Math.max(0, target - chineseScore);
         const text = unlocked
-          ? `✔ 已達標 (目前 ${chineseScore} 分)`
-          : `國文目前 ${chineseScore} 分，還差 ${diff} 分達標`;
+          ? isTop15 && !isAbsolute
+            ? "🏆 榮登班級前 15% 解鎖"
+            : `✔ 已達標 (目前 ${chineseScore} 分)`
+          : `國文目前 ${chineseScore} 分，還差 ${diff} 分達標 (需 ≥85 或前15%門檻 ${chineseP85}分)`;
         return { percent, text, unlocked };
       }
       case "ENGLISH_STORM": {
-        const percent = Math.min(100, Math.round((englishScore / 85) * 100));
-        const diff = Math.max(0, 85 - englishScore);
-        const unlocked = englishScore >= 85;
+        const isAbsolute = englishScore >= 85;
+        const isTop15 = englishScore >= englishP85;
+        const unlocked = isAbsolute || isTop15;
+        const target = Math.min(85, englishP85);
+        const percent = unlocked ? 100 : Math.min(100, Math.round((englishScore / target) * 100));
+        const diff = Math.max(0, target - englishScore);
         const text = unlocked
-          ? `✔ 已達標 (目前 ${englishScore} 分)`
-          : `英文目前 ${englishScore} 分，還差 ${diff} 分達標`;
+          ? isTop15 && !isAbsolute
+            ? "🏆 榮登班級前 15% 解鎖"
+            : `✔ 已達標 (目前 ${englishScore} 分)`
+          : `英文目前 ${englishScore} 分，還差 ${diff} 分達標 (需 ≥85 或前15%門檻 ${englishP85}分)`;
         return { percent, text, unlocked };
       }
       case "ADVERSITY_SHATTER": {
@@ -288,6 +308,14 @@ export default function StudentPortalPage() {
 
           {/* 橫向雙指標標籤 */}
           <div className="flex flex-wrap items-center gap-2.5 text-xs">
+            {/* 請假狀態 */}
+            {isExcused && (
+              <div className="px-3 py-2 rounded-xl border font-bold flex items-center gap-2 bg-amber-50 text-amber-800 border-amber-300">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>⚠️ 本週請假備戰中，戰績凍結</span>
+              </div>
+            )}
+
             {/* 作業狀態 */}
             <div
               className={`px-3 py-2 rounded-xl border font-bold flex items-center gap-2 ${

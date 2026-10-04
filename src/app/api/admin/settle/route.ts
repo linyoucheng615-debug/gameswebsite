@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { isAdminAuthenticated } from "@/lib/auth";
 import { pairAndGenerate30sMatches, StudentInputScore } from "@/lib/battleEngine";
-import { ChipId } from "@/lib/chips";
+import { ChipId, calculateP85Threshold } from "@/lib/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +11,10 @@ interface ParsedScoreEntry {
   english: number;
   math: number;
   average: number;
+  isExcused?: boolean;
 }
 
-// 解析文字輸入 (支援「學號 國文 英文 數學」或「學號 成績」或 CSV)
+// 解析文字輸入 (支援「學號 國文 英文 數學」或「學號 請假」或 CSV)
 function parseScoresInput(rawText: string): Map<string, ParsedScoreEntry> {
   const result = new Map<string, ParsedScoreEntry>();
   const lines = rawText.split(/\r?\n/);
@@ -21,6 +22,20 @@ function parseScoresInput(rawText: string): Map<string, ParsedScoreEntry> {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("學號")) continue;
+
+    // 請假標記判定
+    if (trimmed.includes("請假") || trimmed.includes("缺考") || trimmed.includes("EXCUSED")) {
+      const parts = trimmed.split(/[\t,:\s]+/).filter(Boolean);
+      const studentNum = parts[0].trim().toUpperCase();
+      result.set(studentNum, {
+        chinese: 0,
+        english: 0,
+        math: 0,
+        average: 0,
+        isExcused: true,
+      });
+      continue;
+    }
 
     // 匹配常見分隔符：逗號、Tab、空格、冒號
     const parts = trimmed.split(/[\t,:\s]+/).filter(Boolean);
@@ -32,10 +47,10 @@ function parseScoresInput(rawText: string): Map<string, ParsedScoreEntry> {
       const m = parseFloat(parts[3]);
       if (!isNaN(c) && !isNaN(e) && !isNaN(m)) {
         const avg = Math.round(((c + e + m) / 3) * 10) / 10;
-        result.set(studentNum, { chinese: c, english: e, math: m, average: avg });
+        result.set(studentNum, { chinese: c, english: e, math: m, average: avg, isExcused: false });
       }
     } else if (parts.length >= 2) {
-      // 學號 單一成績 (國英數皆採用此分)
+      // 學號 單一成績
       const studentNum = parts[0].trim().toUpperCase();
       const scoreVal = parseFloat(parts[1]);
       if (!isNaN(scoreVal)) {
@@ -44,6 +59,7 @@ function parseScoresInput(rawText: string): Map<string, ParsedScoreEntry> {
           english: scoreVal,
           math: scoreVal,
           average: scoreVal,
+          isExcused: false,
         });
       }
     }
@@ -69,6 +85,9 @@ export async function GET(req: NextRequest) {
     }
 
     const students = await prisma.student.findMany({
+      where: {
+        studentNumber: { notIn: ["COACH_NPC", "BOT-999"] },
+      },
       orderBy: { studentNumber: "asc" },
       include: {
         homeworkRecords: {
@@ -176,11 +195,12 @@ export async function POST(req: NextRequest) {
       for (const item of directScores) {
         if (item.studentNumber) {
           const sNum = item.studentNumber.toUpperCase();
+          const isExcused = !!item.isExcused;
           const c = typeof item.chineseScore === "number" ? item.chineseScore : (item.rawScore ?? 75);
           const e = typeof item.englishScore === "number" ? item.englishScore : (item.rawScore ?? 75);
           const m = typeof item.mathScore === "number" ? item.mathScore : (item.rawScore ?? 75);
           const avg = Math.round(((c + e + m) / 3) * 10) / 10;
-          scoreMap.set(sNum, { chinese: c, english: e, math: m, average: avg });
+          scoreMap.set(sNum, { chinese: c, english: e, math: m, average: avg, isExcused });
         }
       }
     }
@@ -194,6 +214,9 @@ export async function POST(req: NextRequest) {
 
     // 取得所有學生資料、當週作業、自主修練與裝備晶片、以及歷史平均成績
     const allStudents = await prisma.student.findMany({
+      where: {
+        studentNumber: { notIn: ["COACH_NPC", "BOT-999"] },
+      },
       include: {
         homeworkRecords: {
           where: { weekId: week.id },
@@ -216,25 +239,30 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 確保替身機器人存在於資料庫
-    let botSentinel = await prisma.student.findUnique({
-      where: { studentNumber: "BOT-999" },
+    // 確保班級守護教練 (COACH_NPC) 存在於資料庫
+    let coachNpc = await prisma.student.findUnique({
+      where: { studentNumber: "COACH_NPC" },
     });
-    if (!botSentinel) {
-      botSentinel = await prisma.student.create({
+    if (!coachNpc) {
+      coachNpc = await prisma.student.create({
         data: {
-          studentNumber: "BOT-999",
-          name: "守門武士 (替身)",
+          studentNumber: "COACH_NPC",
+          name: "班級守護教練",
           gender: "BOY",
         },
       });
     }
 
+    // 計算全班動態 PR85 (Top 15%) 門檻分數
+    const validScores = Array.from(scoreMap.values()).filter((s) => !s.isExcused);
+    const mathP85Threshold = calculateP85Threshold(validScores.map((s) => s.math));
+    const chineseP85Threshold = calculateP85Threshold(validScores.map((s) => s.chinese));
+    const englishP85Threshold = calculateP85Threshold(validScores.map((s) => s.english));
+
     const inputScores: StudentInputScore[] = [];
     const missingInBatch: string[] = [];
 
     for (const student of allStudents) {
-      if (student.studentNumber === "BOT-999") continue;
       const sNum = student.studentNumber.toUpperCase();
       if (scoreMap.has(sNum)) {
         const parsedEntry = scoreMap.get(sNum)!;
@@ -274,6 +302,7 @@ export async function POST(req: NextRequest) {
           hasHomeworkCompleted: isHwCompleted,
           hasCompletedAnyQuest,
           equippedChip,
+          isExcused: parsedEntry.isExcused,
         });
       } else {
         missingInBatch.push(student.studentNumber);
@@ -284,8 +313,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "輸入的學號與資料庫學生名單無任何吻合" }, { status: 400 });
     }
 
-    // 執行 30 秒學力推演配對與模擬
-    const pairs = pairAndGenerate30sMatches(inputScores, week.weekNumber, week.title);
+    // 查詢過去 2 週交手歷史以支援 Matchmaking Cooldown
+    const pastMatches = await prisma.battleMatch.findMany({
+      where: {
+        academicWeek: {
+          weekNumber: { lt: week.weekNumber },
+        },
+      },
+      include: { academicWeek: true },
+    });
+    const historyPairs = pastMatches.map((m) => ({
+      player1Id: m.player1Id,
+      player2Id: m.player2Id,
+      weekNumber: m.academicWeek.weekNumber,
+    }));
+
+    // 執行 30 秒學力推演配對與模擬 (含邊界請假排除與守護教練補位)
+    const pairs = pairAndGenerate30sMatches(
+      inputScores,
+      week.weekNumber,
+      week.title,
+      historyPairs
+    );
 
     // 資料庫交易寫入：更新成績、儲存對戰記錄、標記已結算
     await prisma.$transaction(async (tx) => {
@@ -325,14 +374,14 @@ export async function POST(req: NextRequest) {
       // 3. 寫入配對與戰果
       for (const pair of pairs) {
         const p1Id = pair.player1.studentId;
-        const p2Id = pair.player2.studentId === "bot_sentinel" ? botSentinel.id : pair.player2.studentId;
+        const p2Id = pair.player2.studentNumber === "COACH_NPC" ? coachNpc.id : pair.player2.studentId;
 
         await tx.battleMatch.create({
           data: {
             weekId: week.id,
             player1Id: p1Id,
             player2Id: p2Id,
-            winnerId: pair.winnerId === "bot_sentinel" ? botSentinel.id : pair.winnerId,
+            winnerId: pair.winnerId === "coach_npc_id" ? coachNpc.id : pair.winnerId,
             isDraw: pair.isDraw,
             battleLog: JSON.stringify(pair.battleLog),
           },
@@ -351,6 +400,11 @@ export async function POST(req: NextRequest) {
       message: `結算完成！共配對 ${pairs.length} 組對戰（包含 ${inputScores.length} 位學生成績）`,
       pairsCount: pairs.length,
       studentsCount: inputScores.length,
+      p85Thresholds: {
+        math: mathP85Threshold,
+        chinese: chineseP85Threshold,
+        english: englishP85Threshold,
+      },
       pairs: pairs.map((p) => ({
         player1: p.player1,
         player2: p.player2,
@@ -363,4 +417,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || "成績結算失敗" }, { status: 500 });
   }
 }
-

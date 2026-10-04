@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { TACTICAL_CHIPS, isChipUnlocked, ChipId } from "@/lib/chips";
+import { TACTICAL_CHIPS, isChipUnlocked, ChipId, calculateP85Threshold } from "@/lib/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -186,7 +186,14 @@ export async function GET(
       hasUnlockedChip: questLog?.hasUnlockedChip ?? false,
     };
 
-    // 6. 晶片解鎖狀態
+    // 6. 晶片解鎖狀態與班級 PR85 (Top 15%) 門檻
+    const weekExamScores = allExamScores.filter((s) => s.weekId === currentWeek.id && (s.averageScore || 0) > 0);
+    const mathP85Threshold = calculateP85Threshold(weekExamScores.map((s) => s.mathScore || 0));
+    const chineseP85Threshold = calculateP85Threshold(weekExamScores.map((s) => s.chineseScore || 0));
+    const englishP85Threshold = calculateP85Threshold(weekExamScores.map((s) => s.englishScore || 0));
+
+    const isExcused = !currentScore || (currentScore.chineseScore === 0 && currentScore.englishScore === 0 && currentScore.mathScore === 0);
+
     const hasHwComp = currentHomework?.status === "COMPLETED";
     const chipQualificationData = {
       chineseScore: currentScore?.chineseScore || 0,
@@ -196,15 +203,19 @@ export async function GET(
       previousAverage: currentScore?.previousAverage || 0,
       hasHomeworkCompleted: hasHwComp,
       hasCompletedAnyQuest: questLog?.hasUnlockedChip ?? false,
+      mathP85Threshold,
+      chineseP85Threshold,
+      englishP85Threshold,
     };
 
     const chipsList = (Object.keys(TACTICAL_CHIPS) as ChipId[]).map((cid) => {
       const meta = TACTICAL_CHIPS[cid];
-      const { unlocked, reason } = isChipUnlocked(cid, chipQualificationData);
+      const { unlocked, reason, isTop15Percent } = isChipUnlocked(cid, chipQualificationData);
       return {
         ...meta,
         unlocked,
         lockReason: reason,
+        isTop15Percent: !!isTop15Percent,
       };
     });
 
@@ -309,6 +320,12 @@ export async function GET(
       chips: chipsList,
       equippedChip,
       match: matchView,
+      isExcused,
+      p85Thresholds: {
+        math: mathP85Threshold,
+        chinese: chineseP85Threshold,
+        english: englishP85Threshold,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/portal/[studentNumber] error:", error);

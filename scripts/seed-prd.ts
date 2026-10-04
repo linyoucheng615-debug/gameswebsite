@@ -363,8 +363,21 @@ async function seed() {
   console.log("生成第 1 週對戰配對推演戰報...");
   const { pairAndGenerate30sMatches } = await import("../src/lib/battleEngine");
 
+  let coachNpc = await prisma.student.findUnique({
+    where: { studentNumber: "COACH_NPC" },
+  });
+  if (!coachNpc) {
+    coachNpc = await prisma.student.create({
+      data: {
+        studentNumber: "COACH_NPC",
+        name: "班級守護教練",
+        gender: "BOY",
+      },
+    });
+  }
+
   const studentsAll = await prisma.student.findMany({
-    where: { studentNumber: { not: "BOT-999" } },
+    where: { studentNumber: { notIn: ["BOT-999", "COACH_NPC"] } },
     include: {
       examScores: { where: { weekId: week.id } },
       homeworkRecords: { where: { weekId: week.id } },
@@ -402,12 +415,15 @@ async function seed() {
   });
 
   for (const pair of pairs) {
+    const p1Id = pair.player1.studentId;
+    const p2Id = pair.player2.studentNumber === "COACH_NPC" ? coachNpc.id : pair.player2.studentId;
+
     await prisma.battleMatch.create({
       data: {
         weekId: week.id,
-        player1Id: pair.player1.studentId,
-        player2Id: pair.player2.studentId,
-        winnerId: pair.winnerId,
+        player1Id: p1Id,
+        player2Id: p2Id,
+        winnerId: pair.winnerId === "coach_npc_id" ? coachNpc.id : pair.winnerId,
         isDraw: pair.isDraw,
         battleLog: JSON.stringify(pair.battleLog),
       },
