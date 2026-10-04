@@ -26,6 +26,11 @@ import { getAvatarMeta } from "@/lib/avatars";
 import { StudentBattleViewData } from "@/types";
 import BattleArenaPlayer from "@/components/BattleArenaPlayer";
 import BeginnerGuideModal from "@/components/BeginnerGuideModal";
+import PixelFighterSprite, {
+  SkinGender,
+  SkinClass,
+  SkinColor,
+} from "@/components/PixelFighterSprite";
 
 function getLevelTitle(level: number): string {
   if (level >= 10) return "🌟 傳奇大魔導士";
@@ -162,6 +167,14 @@ export default function StudentLobbyPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* 角色更衣室按鈕 */}
+          <Link
+            href={`/student/${studentNumber}/character`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-950/70 hover:bg-indigo-900/90 text-indigo-300 hover:text-indigo-200 border border-indigo-500/50 font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+          >
+            <span>🧙‍♂️ 角色更衣室</span>
+          </Link>
+
           {/* 常駐規則指引按鈕 */}
           <button
             type="button"
@@ -188,18 +201,25 @@ export default function StudentLobbyPage() {
         <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
-          {/* 像素角色頭像與底座 */}
+          {/* 16-bit 像素角色渲染與底座 */}
           <div className="relative flex flex-col items-center shrink-0">
-            <div
-              className={`w-24 h-24 rounded-2xl flex items-center justify-center text-5xl bg-gradient-to-br ${avatar.bgGradient} border-2 ${avatar.border} shadow-lg relative z-10`}
-            >
-              {avatar.emoji}
+            <div className="w-28 h-28 rounded-2xl bg-slate-900/90 border-2 border-slate-700/80 shadow-xl flex items-center justify-center relative overflow-hidden">
+              <PixelFighterSprite
+                gender={(student.skinGender as SkinGender) || "boy"}
+                charClass={(student.skinClass as SkinClass) || "warrior"}
+                color={(student.skinColor as SkinColor) || "blue"}
+                action="idle"
+                size={110}
+              />
             </div>
             {/* 圓形發光基座 */}
-            <div className="w-28 h-5 -mt-2.5 bg-gradient-to-r from-sky-500/20 via-sky-400/40 to-sky-500/20 rounded-full blur-[2px] border border-sky-400/30" />
-            <span className="text-[11px] font-bold text-cyan-400 mt-2 font-mono">
-              {avatar.name}
-            </span>
+            <div className="w-32 h-5 -mt-2.5 bg-gradient-to-r from-sky-500/20 via-sky-400/40 to-sky-500/20 rounded-full blur-[2px] border border-sky-400/30" />
+            <Link
+              href={`/student/${studentNumber}/character`}
+              className="text-[11px] font-bold text-amber-300 hover:underline mt-2 flex items-center gap-0.5"
+            >
+              <span>自訂外觀 ❯</span>
+            </Link>
           </div>
 
           {/* 學生資訊、等級與徽章 */}
@@ -453,7 +473,7 @@ export default function StudentLobbyPage() {
             {/* 歷次成績清單 */}
             {historyScores.length > 0 ? (
               <div className="space-y-3">
-                {historyScores.map((h, i) => {
+                {historyScores.map((h: any, i: number) => {
                   const tier =
                     h.effectivePower >= 90
                       ? { label: "S", color: "text-amber-400 border-amber-500/50" }
@@ -520,3 +540,4 @@ export default function StudentLobbyPage() {
     </div>
   );
 }
+

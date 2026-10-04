@@ -66,6 +66,54 @@ export async function GET(
         console.error("Failed to parse battleLog:", e);
       }
 
+      // 取得雙方外觀設定、出牌策略、起始血量與 Buff
+      const opponentStudent = isPlayerA ? latestMatch.playerB : latestMatch.playerA;
+
+      const myStrat = await prisma.studentStrategy.findUnique({
+        where: { studentId_weekId: { studentId: student.id, weekId: latestMatch.weekId } },
+      });
+      const oppStrat = opponentStudent
+        ? await prisma.studentStrategy.findUnique({
+            where: { studentId_weekId: { studentId: opponentStudent.id, weekId: latestMatch.weekId } },
+          })
+        : null;
+
+      const myCards = myStrat
+        ? [myStrat.card1, myStrat.card2, myStrat.card3, myStrat.card4, myStrat.card5]
+        : ["charge", "attack", "defend", "charge", "ultimate"];
+
+      const opponentCards = oppStrat
+        ? [oppStrat.card1, oppStrat.card2, oppStrat.card3, oppStrat.card4, oppStrat.card5]
+        : ["attack", "charge", "defend", "break", "ultimate"];
+
+      const myExam = await prisma.examScore.findUnique({
+        where: { weekId_studentId: { weekId: latestMatch.weekId, studentId: student.id } },
+      });
+      const oppExam = opponentStudent
+        ? await prisma.examScore.findUnique({
+            where: { weekId_studentId: { weekId: latestMatch.weekId, studentId: opponentStudent.id } },
+          })
+        : null;
+
+      const myStartingHp = myExam ? Math.round(myExam.rawScore) : 90;
+      const opponentStartingHp = oppExam
+        ? Math.round(oppExam.rawScore)
+        : latestMatch.botPower
+        ? Math.round(latestMatch.botPower)
+        : 85;
+
+      const myHw = await prisma.homeworkRecord.findUnique({
+        where: { weekId_studentId: { weekId: latestMatch.weekId, studentId: student.id } },
+      });
+      const oppHw = opponentStudent
+        ? await prisma.homeworkRecord.findUnique({
+            where: { weekId_studentId: { weekId: latestMatch.weekId, studentId: opponentStudent.id } },
+          })
+        : null;
+
+      const myHasBuff = myHw ? myHw.hasBuff : true;
+      const opponentHasBuff = oppHw ? oppHw.hasBuff : false;
+
       currentMatchData = {
         matchId: latestMatch.id,
         weekNumber: latestMatch.week.weekNumber,
@@ -76,6 +124,22 @@ export async function GET(
         opponentName,
         opponentAvatar,
         result,
+        mySkin: {
+          gender: (student.skinGender as any) || "boy",
+          charClass: (student.skinClass as any) || "warrior",
+          color: (student.skinColor as any) || "blue",
+        },
+        opponentSkin: {
+          gender: (opponentStudent?.skinGender as any) || "girl",
+          charClass: (opponentStudent?.skinClass as any) || "mage",
+          color: (opponentStudent?.skinColor as any) || "red",
+        },
+        myCards,
+        opponentCards,
+        myStartingHp,
+        opponentStartingHp,
+        myHasBuff,
+        opponentHasBuff,
       };
     }
 

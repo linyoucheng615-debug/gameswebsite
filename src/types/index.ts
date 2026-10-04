@@ -6,6 +6,9 @@ export interface Student {
   name: string;
   parentPhone?: string | null;
   avatarId: string;
+  skinGender?: string;
+  skinClass?: string;
+  skinColor?: string;
   wins: number;
   losses: number;
   draws: number;
@@ -120,6 +123,22 @@ export interface StudentBattleViewData {
     opponentName: string;
     opponentAvatar: string;
     result: "win" | "loss" | "draw" | "pending";
+    mySkin?: {
+      gender: "boy" | "girl";
+      charClass: "warrior" | "mage" | "ranger" | "assassin";
+      color: "blue" | "red" | "green" | "purple" | "gold";
+    };
+    opponentSkin?: {
+      gender: "boy" | "girl";
+      charClass: "warrior" | "mage" | "ranger" | "assassin";
+      color: "blue" | "red" | "green" | "purple" | "gold";
+    };
+    myCards?: string[];
+    opponentCards?: string[];
+    myStartingHp?: number;
+    opponentStartingHp?: number;
+    myHasBuff?: boolean;
+    opponentHasBuff?: boolean;
   } | null;
   historyScores: {
     weekNumber: number;

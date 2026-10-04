@@ -18,6 +18,9 @@ model Student {
   name          String   // 學生真實姓名
   parentPhone   String?  // 家長聯絡電話
   avatarId      String   @default("pixel-knight") // 2D 像素外觀 ID (pixel-knight, pixel-mage, pixel-ninja, pixel-archer...)
+  skinGender    String   @default("boy") // "boy" | "girl"
+  skinClass     String   @default("warrior") // "warrior" | "mage" | "ranger" | "assassin"
+  skinColor     String   @default("blue") // "blue" | "red" | "green" | "purple" | "gold"
   wins          Int      @default(0) // 勝場數
   losses        Int      @default(0) // 敗場數
   draws         Int      @default(0) // 平手數
