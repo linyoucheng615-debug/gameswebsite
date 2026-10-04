@@ -52,12 +52,13 @@ export default function StudentLayout({
       {/* Modern Clean SaaS Footer */}
       <footer className="border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>© 補習班「週考成績平台」• 專業學力數據分析與學習激勵系統</p>
+          <p>© 週考成績平台 • 專業學力數據分析與學習激勵系統</p>
           <p className="text-[11px] text-slate-400">
-            按時繳交作業可啟用作業護盾減傷加成
+            查看歷史成績，考高分增強本週戰力
           </p>
         </div>
       </footer>
     </div>
   );
 }
+

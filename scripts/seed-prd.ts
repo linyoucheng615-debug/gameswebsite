@@ -359,6 +359,62 @@ async function seed() {
     });
   }
 
+  // 4. 自動生成第 1 週實力相近配對與 30 秒推演戰報
+  console.log("生成第 1 週對戰配對推演戰報...");
+  const { pairAndGenerate30sMatches } = await import("../src/lib/battleEngine");
+
+  const studentsAll = await prisma.student.findMany({
+    where: { studentNumber: { not: "BOT-999" } },
+    include: {
+      examScores: { where: { weekId: week.id } },
+      homeworkRecords: { where: { weekId: week.id } },
+      questLogs: { where: { weekId: week.id } },
+      weeklyLoadouts: { where: { weekId: week.id } },
+    },
+    orderBy: { studentNumber: "asc" },
+  });
+
+  const inputScores = studentsAll.map((s) => {
+    const sc = s.examScores[0];
+    const hw = s.homeworkRecords[0];
+    const ql = s.questLogs[0];
+    const lo = s.weeklyLoadouts[0];
+    return {
+      studentNumber: s.studentNumber,
+      name: s.name,
+      gender: (s.gender as any) || "BOY",
+      studentId: s.id,
+      chineseScore: sc?.chineseScore ?? 75,
+      englishScore: sc?.englishScore ?? 75,
+      mathScore: sc?.mathScore ?? 75,
+      averageScore: sc?.averageScore ?? 75,
+      previousAverage: sc?.previousAverage ?? 75,
+      hasHomeworkCompleted: hw?.status === "COMPLETED",
+      hasCompletedAnyQuest: ql?.hasUnlockedChip ?? true,
+      equippedChip: (lo?.equippedChip as any) || "ADVERSITY_SHATTER",
+    };
+  });
+
+  const pairs = pairAndGenerate30sMatches(inputScores, week.weekNumber, week.title);
+
+  await prisma.battleMatch.deleteMany({
+    where: { weekId: week.id },
+  });
+
+  for (const pair of pairs) {
+    await prisma.battleMatch.create({
+      data: {
+        weekId: week.id,
+        player1Id: pair.player1.studentId,
+        player2Id: pair.player2.studentId,
+        winnerId: pair.winnerId,
+        isDraw: pair.isDraw,
+        battleLog: JSON.stringify(pair.battleLog),
+      },
+    });
+  }
+
+  console.log(`✔ 已生成 ${pairs.length} 組對戰推演！`);
   console.log("✔ 學生成績、作業、修練與晶片種子完畢！");
 }
 
