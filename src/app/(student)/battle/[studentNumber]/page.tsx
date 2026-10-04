@@ -371,11 +371,11 @@ export default function StudentBattlePage() {
           </button>
 
           <Link
-            href="/"
-            className="text-xs text-slate-400 hover:text-white flex items-center gap-1 px-2 py-1.5 rounded hover:bg-slate-800 transition-colors font-mono"
+            href={`/student/${studentNumber}`}
+            className="text-xs text-amber-300 hover:text-white flex items-center gap-1 px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors font-sans font-bold"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>切換</span>
+            <span>返回大廳</span>
           </Link>
         </div>
       </div>
@@ -655,6 +655,13 @@ export default function StudentBattlePage() {
                         </span>
                       )}
                     </div>
+
+                    <Link
+                      href={`/student/${studentNumber}`}
+                      className="block w-full py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded transition-all text-center"
+                    >
+                      返回冒險者大廳
+                    </Link>
                   </div>
                 )}
               </div>

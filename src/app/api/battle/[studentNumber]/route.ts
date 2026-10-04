@@ -107,6 +107,34 @@ export async function GET(
     const totalMatches = student.wins + student.losses + student.draws;
     const winRate = totalMatches > 0 ? Math.round((student.wins / totalMatches) * 1000) / 10 : 0;
 
+    // 5. 取得本週最新週次與作業任務狀態
+    const latestWeek = await prisma.academicWeek.findFirst({
+      orderBy: { weekNumber: "desc" },
+    });
+
+    let currentWeekHomework: StudentBattleViewData["currentWeekHomework"] = null;
+    if (latestWeek) {
+      const currentHw = await prisma.homeworkRecord.findFirst({
+        where: {
+          weekId: latestWeek.id,
+          studentId: student.id,
+        },
+      });
+
+      const hasBuff = currentHw ? currentHw.hasBuff : true;
+      const status = (currentHw?.status as "completed" | "missing" | "partial") || "completed";
+
+      currentWeekHomework = {
+        weekNumber: latestWeek.weekNumber,
+        unitTitle: latestWeek.title,
+        deadlineText: latestWeek.deadline,
+        isSettled: latestWeek.isSettled,
+        status,
+        missingScope: currentHw?.missingScope || null,
+        hasBuff,
+      };
+    }
+
     const responseData: StudentBattleViewData = {
       student: {
         id: student.id,
@@ -126,6 +154,7 @@ export async function GET(
         draws: student.draws,
         winRate,
       },
+      currentWeekHomework,
     };
 
     return NextResponse.json(responseData);

@@ -136,4 +136,13 @@ export interface StudentBattleViewData {
     draws: number;
     winRate: number;
   };
+  currentWeekHomework?: {
+    weekNumber: number;
+    unitTitle: string;
+    deadlineText: string;
+    isSettled: boolean;
+    status: "completed" | "missing" | "partial";
+    missingScope?: string | null;
+    hasBuff: boolean;
+  } | null;
 }
