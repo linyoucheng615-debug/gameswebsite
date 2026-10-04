@@ -135,6 +135,11 @@ export async function GET(
       };
     }
 
+    // 6. 取得學生經驗值與金幣資料
+    const expCoin = await prisma.studentExpCoin.findUnique({
+      where: { studentId: student.id },
+    });
+
     const responseData: StudentBattleViewData = {
       student: {
         id: student.id,
@@ -155,6 +160,9 @@ export async function GET(
         winRate,
       },
       currentWeekHomework,
+      playerExpCoin: expCoin
+        ? { level: expCoin.level, currentExp: expCoin.currentExp, coins: expCoin.coins }
+        : { level: 1, currentExp: 0, coins: 0 },
     };
 
     return NextResponse.json(responseData);

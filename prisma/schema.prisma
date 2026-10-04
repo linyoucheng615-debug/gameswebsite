@@ -29,6 +29,8 @@ model Student {
   matchesAsA      BattleMatch[]    @relation("PlayerAMatches")
   matchesAsB      BattleMatch[]    @relation("PlayerBMatches")
   wonMatches      BattleMatch[]    @relation("WonMatches")
+  expCoin         StudentExpCoin?
+  strategies      StudentStrategy[]
 
   @@map("students")
 }
@@ -46,6 +48,7 @@ model AcademicWeek {
   homeworkRecords HomeworkRecord[]
   examScores      ExamScore[]
   battleMatches   BattleMatch[]
+  strategies      StudentStrategy[]
 
   @@map("academic_weeks")
 }
@@ -107,3 +110,52 @@ model BattleMatch {
 
   @@map("battle_matches")
 }
+
+// 6. 單字題庫資料表 (英文、中文)
+model VocabularyWord {
+  id        String   @id @default(cuid())
+  english   String   @unique
+  chinese   String
+  createdAt DateTime @default(now())
+
+  @@map("vocabulary_words")
+}
+
+// 7. 學生經驗值與金幣資料表 (等級、當前經驗、金幣、每日已測驗次數、上次測驗日期)
+model StudentExpCoin {
+  id             String   @id @default(cuid())
+  studentId      String   @unique
+  level          Int      @default(1)
+  currentExp     Int      @default(0)
+  coins          Int      @default(0)
+  dailyQuizCount Int      @default(0)
+  lastQuizDate   String?  // 格式 YYYY-MM-DD 用於跨日重置每日3次上限
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  student        Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("student_exp_coins")
+}
+
+// 8. 學生每週出牌戰術表 (學生ID、週次ID、5回合出招卡片、是否鎖定)
+model StudentStrategy {
+  id        String       @id @default(cuid())
+  studentId String
+  weekId    String
+  card1     String       @default("charge")   // charge | attack | defend | break | ultimate
+  card2     String       @default("attack")
+  card3     String       @default("defend")
+  card4     String       @default("charge")
+  card5     String       @default("ultimate")
+  isLocked  Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  student   Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  week      AcademicWeek @relation(fields: [weekId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, weekId])
+  @@map("student_strategies")
+}
+

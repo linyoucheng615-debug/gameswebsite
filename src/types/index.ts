@@ -145,4 +145,9 @@ export interface StudentBattleViewData {
     missingScope?: string | null;
     hasBuff: boolean;
   } | null;
+  playerExpCoin?: {
+    level: number;
+    currentExp: number;
+    coins: number;
+  };
 }
