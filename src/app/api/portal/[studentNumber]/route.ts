@@ -72,25 +72,35 @@ export async function GET(
       include: { academicWeek: true },
     });
 
-    // 班級平均
-    const weekClassAvgMap = new Map<string, number>();
+    // 各科及總分班級平均
+    const weekClassAvgMap = new Map<string, { chinese: number; english: number; math: number; total: number; average: number }>();
     for (const w of weeks) {
       const scoresInWeek = allExamScores.filter((s) => s.weekId === w.id);
       if (scoresInWeek.length > 0) {
-        const sum = scoresInWeek.reduce((acc, curr) => acc + (curr.averageScore || 0), 0);
-        weekClassAvgMap.set(w.id, Math.round((sum / scoresInWeek.length) * 10) / 10);
+        const cSum = scoresInWeek.reduce((acc, curr) => acc + (curr.chineseScore || 0), 0);
+        const eSum = scoresInWeek.reduce((acc, curr) => acc + (curr.englishScore || 0), 0);
+        const mSum = scoresInWeek.reduce((acc, curr) => acc + (curr.mathScore || 0), 0);
+        const count = scoresInWeek.length;
+        const cAvg = Math.round((cSum / count) * 10) / 10;
+        const eAvg = Math.round((eSum / count) * 10) / 10;
+        const mAvg = Math.round((mSum / count) * 10) / 10;
+        const totAvg = Math.round((cAvg + eAvg + mAvg) * 10) / 10;
+        const avg = Math.round((totAvg / 3) * 10) / 10;
+        weekClassAvgMap.set(w.id, { chinese: cAvg, english: eAvg, math: mAvg, total: totAvg, average: avg });
       } else {
-        weekClassAvgMap.set(w.id, 75);
+        weekClassAvgMap.set(w.id, { chinese: 75, english: 75, math: 75, total: 225, average: 75 });
       }
     }
 
     const chartData = weeks.map((w) => {
       const score = studentExamScores.find((s) => s.weekId === w.id);
       const hw = studentHomeworks.find((h) => h.weekId === w.id);
-      const c = score?.chineseScore || 75;
-      const e = score?.englishScore || 75;
-      const m = score?.mathScore || 75;
-      const avg = score?.averageScore || Math.round(((c + e + m) / 3) * 10) / 10;
+      const c = score?.chineseScore ?? 75;
+      const e = score?.englishScore ?? 75;
+      const m = score?.mathScore ?? 75;
+      const total = Math.round((c + e + m) * 10) / 10;
+      const avg = score?.averageScore ?? Math.round(((c + e + m) / 3) * 10) / 10;
+      const classStat = weekClassAvgMap.get(w.id) ?? { chinese: 75, english: 75, math: 75, total: 225, average: 75 };
 
       return {
         weekNumber: w.weekNumber,
@@ -98,8 +108,13 @@ export async function GET(
         chinese: c,
         english: e,
         math: m,
+        total,
         average: avg,
-        classAverage: weekClassAvgMap.get(w.id) ?? 75,
+        chineseClassAvg: classStat.chinese,
+        englishClassAvg: classStat.english,
+        mathClassAvg: classStat.math,
+        totalClassAvg: classStat.total,
+        averageClassAvg: classStat.average,
         homeworkStatus: hw?.status || "COMPLETED",
       };
     });
@@ -300,3 +315,4 @@ export async function GET(
     return NextResponse.json({ error: "載入看板資料失敗" }, { status: 500 });
   }
 }
+

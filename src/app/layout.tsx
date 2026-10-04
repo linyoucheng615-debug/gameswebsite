@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "小六週考對戰與作業管理系統",
-  description: "補習班小六「遊戲化週考對戰與作業管理系統」",
+  title: "週考成績平台 - 國英數學力儀表板",
+  description: "補習班國英數週考成績平台：專業學力數據分析與學習激勵系統",
 };
 
 export default function RootLayout({

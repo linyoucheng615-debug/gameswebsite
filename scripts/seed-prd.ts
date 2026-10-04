@@ -365,3 +365,4 @@ async function seed() {
 seed()
   .catch((e) => console.error(e))
   .finally(() => prisma.$disconnect());
+

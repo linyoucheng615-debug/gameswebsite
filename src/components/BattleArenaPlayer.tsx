@@ -11,6 +11,11 @@ import {
   Trophy,
   Shield,
   Zap,
+  Flame,
+  CheckCircle2,
+  AlertCircle,
+  Swords,
+  ChevronRight,
 } from "lucide-react";
 import { retroAudio } from "@/lib/audioEngine";
 import PixelFighterSprite, { FighterAction } from "@/components/PixelFighterSprite";
@@ -67,6 +72,13 @@ export default function BattleArenaPlayer({
 
   // 狀態管理
   const [seconds, setSeconds] = useState(0);
+  const [currentStage, setCurrentStage] = useState<1 | 2 | 3 | 4>(1); // 1: 試探, 2: 護盾, 3: 奧義, 4: 結算
+  const [stageDesc, setStageDesc] = useState<{ step: string; detail: string; badge: string }>({
+    badge: "Round 1 試探普攻",
+    step: "推演準備就緒",
+    detail: "雙方選手進入推演擂台...",
+  });
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -76,6 +88,11 @@ export default function BattleArenaPlayer({
   const [action1, setAction1] = useState<FighterAction>("idle");
   const [action2, setAction2] = useState<FighterAction>("idle");
 
+  // 攻擊與防守特效
+  const [projectile, setProjectile] = useState<"p1_to_p2" | "p2_to_p1" | null>(null);
+  const [shieldActive1, setShieldActive1] = useState(false);
+  const [shieldActive2, setShieldActive2] = useState(false);
+
   const [floatDamage1, setFloatDamage1] = useState<{ val: number; isCrit?: boolean; isHeal?: boolean } | null>(null);
   const [floatDamage2, setFloatDamage2] = useState<{ val: number; isCrit?: boolean; isHeal?: boolean } | null>(null);
 
@@ -84,7 +101,6 @@ export default function BattleArenaPlayer({
   const [chipBanner, setChipBanner] = useState<{ title: string; desc: string; color: string } | null>(null);
   const [activeChipAnim, setActiveChipAnim] = useState<ChipId | null>(null);
 
-  const [commentary, setCommentary] = useState("30 秒學力推演引擎準備就緒...");
   const [finished, setFinished] = useState(false);
 
   const timersRef = useRef<any[]>([]);
@@ -115,16 +131,20 @@ export default function BattleArenaPlayer({
     }
   }
 
-  // 30 秒推演時間軸排程
+  // 順序分明、輪流攻擊推演時間軸 (Sequential Turn-Based Simulation)
   function startSimulation() {
     clearTimers();
     setIsPlaying(true);
     setFinished(false);
     setSeconds(0);
+    setCurrentStage(1);
     setHp1(initialHp1);
     setHp2(initialHp2);
     setAction1("idle");
     setAction2("idle");
+    setProjectile(null);
+    setShieldActive1(false);
+    setShieldActive2(false);
     setFloatDamage1(null);
     setFloatDamage2(null);
     setShakeIntensity(0);
@@ -145,77 +165,189 @@ export default function BattleArenaPlayer({
       }
     }, 1000);
 
-    // ==========================================
-    // 00:00 - 00:08【Round 1 試探交鋒】
-    // ==========================================
-    setCommentary(`【0~8s Round 1 試探交鋒】雙方短兵相接，互換普攻！`);
-    const tR1_hit = setTimeout(() => {
+    // =========================================================================
+    // 【Round 1：試探交鋒 (0~8s)】依序輪流出手，清晰看懂攻守
+    // =========================================================================
+    setStageDesc({
+      badge: "Round 1 試探普攻",
+      step: `【${p1.name}】率先發動普攻突進！`,
+      detail: "雙方短兵相接，由先手發動試探揮砍。",
+    });
+
+    // Step 1: P1 攻擊 P2 (0.8s)
+    const tR1_p1_atk = setTimeout(() => {
       setAction1("attack");
-      setAction2("attack");
+      setProjectile("p1_to_p2");
       retroAudio.playSlash();
       setShakeIntensity(2);
 
-      const tR1_dmg = setTimeout(() => {
-        setAction1("hurt");
+      const tR1_p2_hit = setTimeout(() => {
+        setProjectile(null);
         setAction2("hurt");
+        retroAudio.playHit();
+        setFloatDamage2({ val: r1.damageToP2 });
+        setHp2((h: number) => Math.max(10, h - r1.damageToP2));
+        setStageDesc({
+          badge: "Round 1 試探普攻",
+          step: `【${p1.name}】突進揮砍命中！`,
+          detail: `造成 ${r1.damageToP2} 點基礎傷害，${p2.name} 穩住陣腳準備反擊！`,
+        });
+
+        const tR1_p1_back = setTimeout(() => {
+          setAction1("idle");
+          setAction2("idle");
+          setShakeIntensity(0);
+          setFloatDamage2(null);
+        }, 1200);
+        timersRef.current.push(tR1_p1_back);
+      }, 700);
+      timersRef.current.push(tR1_p2_hit);
+    }, 800);
+    timersRef.current.push(tR1_p1_atk);
+
+    // Step 2: P2 反擊 P1 (4.0s)
+    const tR1_p2_atk = setTimeout(() => {
+      setStageDesc({
+        badge: "Round 1 試探普攻",
+        step: `【${p2.name}】迅速揮劍反擊！`,
+        detail: `不甘示弱回敬攻勢，劍光直指 ${p1.name}！`,
+      });
+      setAction2("attack");
+      setProjectile("p2_to_p1");
+      retroAudio.playSlash();
+      setShakeIntensity(2);
+
+      const tR1_p1_hit = setTimeout(() => {
+        setProjectile(null);
+        setAction1("hurt");
         retroAudio.playHit();
         setFloatDamage1({ val: r1.damageToP1 });
-        setFloatDamage2({ val: r1.damageToP2 });
         setHp1((h: number) => Math.max(10, h - r1.damageToP1));
-        setHp2((h: number) => Math.max(10, h - r1.damageToP2));
+        setStageDesc({
+          badge: "Round 1 試探普攻",
+          step: `【${p2.name}】反擊成功！`,
+          detail: `造成 ${r1.damageToP1} 點傷害，第一回合試探結束！`,
+        });
 
-        const tR1_reset = setTimeout(() => {
-          setShakeIntensity(0);
+        const tR1_p2_back = setTimeout(() => {
           setAction1("idle");
           setAction2("idle");
-          setFloatDamage1(null);
-          setFloatDamage2(null);
-        }, 1200);
-        timersRef.current.push(tR1_reset);
-      }, 1000);
-      timersRef.current.push(tR1_dmg);
-    }, 2500);
-    timersRef.current.push(tR1_hit);
-
-    // ==========================================
-    // 00:08 - 00:18【Round 2 戰況升溫】
-    // ==========================================
-    const tR2 = setTimeout(() => {
-      setCommentary(`【8~18s Round 2 戰況升溫】作業護盾減傷激戰，逼近半血警戒！`);
-      setAction1("attack");
-      setAction2("attack");
-      retroAudio.playSlash();
-      setShakeIntensity(4);
-
-      const tR2_hit = setTimeout(() => {
-        setAction1("hurt");
-        setAction2("hurt");
-        retroAudio.playHit();
-        setFloatDamage1({ val: r2.damageToP1 });
-        setFloatDamage2({ val: r2.damageToP2 });
-        setHp1((h: number) => Math.max(10, h - r2.damageToP1));
-        setHp2((h: number) => Math.max(10, h - r2.damageToP2));
-
-        const tR2_reset = setTimeout(() => {
           setShakeIntensity(0);
-          setAction1("idle");
-          setAction2("idle");
           setFloatDamage1(null);
-          setFloatDamage2(null);
         }, 1200);
-        timersRef.current.push(tR2_reset);
-      }, 1200);
-      timersRef.current.push(tR2_hit);
-    }, 8500);
-    timersRef.current.push(tR2);
+        timersRef.current.push(tR1_p2_back);
+      }, 700);
+      timersRef.current.push(tR1_p1_hit);
+    }, 4000);
+    timersRef.current.push(tR1_p2_atk);
 
-    // ==========================================
-    // 00:18 - 00:28【Round 3 晶片大招對轟】
-    // ==========================================
-    const tR3 = setTimeout(() => {
-      // 畫面全黑 0.6 秒 (Super Flash)
+    // =========================================================================
+    // 【Round 2：作業護盾防守 (8~18s)】具象光盾特效吸收傷害
+    // =========================================================================
+    const tR2_start = setTimeout(() => {
+      setCurrentStage(2);
+      setStageDesc({
+        badge: "Round 2 作業護盾防守",
+        step: "戰況升溫！檢驗本週作業完成度！",
+        detail: "按時繳交作業者，身上的【作業護盾】將大幅減免所受傷害！",
+      });
+
+      // Step 2-1: P1 重擊，P2 護盾防守 (9.5s)
+      const tR2_p1_strike = setTimeout(() => {
+        setAction1("attack");
+        setProjectile("p1_to_p2");
+        retroAudio.playSlash();
+        setShakeIntensity(3);
+
+        const tR2_p2_defend = setTimeout(() => {
+          setProjectile(null);
+          // 觸發 P2 護盾特效
+          setShieldActive2(true);
+          setAction2(p2.hasHomeworkCompleted ? "defend" : "hurt");
+          retroAudio.playHit();
+
+          setFloatDamage2({ val: r2.damageToP2 });
+          setHp2((h: number) => Math.max(10, h - r2.damageToP2));
+
+          setStageDesc({
+            badge: "Round 2 作業護盾防守",
+            step: p2.hasHomeworkCompleted ? `【${p2.name}】作業護盾生效！` : `【${p2.name}】無作業護盾加成！`,
+            detail: p2.hasHomeworkCompleted
+              ? `🛡️ 準時繳交作業啟動金光護盾，成功吸收 15% 傷害，僅受 ${r2.damageToP2} 點傷害！`
+              : `⚠️ 本週作業缺漏或待訂正，承受全額 ${r2.damageToP2} 點重擊傷害！`,
+          });
+
+          const tR2_p2_reset = setTimeout(() => {
+            setAction1("idle");
+            setAction2("idle");
+            setShieldActive2(false);
+            setShakeIntensity(0);
+            setFloatDamage2(null);
+          }, 1500);
+          timersRef.current.push(tR2_p2_reset);
+        }, 700);
+        timersRef.current.push(tR2_p2_defend);
+      }, 1500);
+      timersRef.current.push(tR2_p1_strike);
+
+      // Step 2-2: P2 重擊，P1 護盾防守 (13.5s)
+      const tR2_p2_strike = setTimeout(() => {
+        setStageDesc({
+          badge: "Round 2 作業護盾防守",
+          step: `【${p2.name}】展開強烈反攻！`,
+          detail: `考驗【${p1.name}】的防禦防線！`,
+        });
+
+        setAction2("attack");
+        setProjectile("p2_to_p1");
+        retroAudio.playSlash();
+        setShakeIntensity(3);
+
+        const tR2_p1_defend = setTimeout(() => {
+          setProjectile(null);
+          // 觸發 P1 護盾特效
+          setShieldActive1(true);
+          setAction1(p1.hasHomeworkCompleted ? "defend" : "hurt");
+          retroAudio.playHit();
+
+          setFloatDamage1({ val: r2.damageToP1 });
+          setHp1((h: number) => Math.max(10, h - r2.damageToP1));
+
+          setStageDesc({
+            badge: "Round 2 作業護盾防守",
+            step: p1.hasHomeworkCompleted ? `【${p1.name}】作業護盾金光格擋！` : `【${p1.name}】無作業護盾加成！`,
+            detail: p1.hasHomeworkCompleted
+              ? `🛡️ 準時繳交作業啟用能量光盾，抵禦重擊，僅扣 ${r2.damageToP1} 點血量！`
+              : `⚠️ 作業未完成，失去護盾保護，承受 ${r2.damageToP1} 點傷害！`,
+          });
+
+          const tR2_p1_reset = setTimeout(() => {
+            setAction1("idle");
+            setAction2("idle");
+            setShieldActive1(false);
+            setShakeIntensity(0);
+            setFloatDamage1(null);
+          }, 1500);
+          timersRef.current.push(tR2_p1_reset);
+        }, 700);
+        timersRef.current.push(tR2_p1_defend);
+      }, 5500);
+      timersRef.current.push(tR2_p2_strike);
+    }, 8000);
+    timersRef.current.push(tR2_start);
+
+    // =========================================================================
+    // 【Round 3：雙軌晶片大招對轟 (18~27s)】專屬具象特效與大招橫幅
+    // =========================================================================
+    const tR3_start = setTimeout(() => {
+      setCurrentStage(3);
+      // 畫面全黑聚光燈 0.6 秒 (Super Flash)
       setSuperFlash(true);
-      setCommentary(`【18~28s Round 3 晶片大招】SUPER FLASH！裝備晶片奧義全場引爆！`);
+      setStageDesc({
+        badge: "Round 3 晶片奧義對轟",
+        step: "⚡ SUPER FLASH！晶片奧義全場引爆！",
+        detail: "核心晶片共鳴覺醒，雙方釋放本週最大學力奧義！",
+      });
       retroAudio.playCrit();
 
       const tFlashEnd = setTimeout(() => {
@@ -225,16 +357,22 @@ export default function BattleArenaPlayer({
 
         // 浮現金色招式橫幅
         setChipBanner({
-          title: `【奧義・${meta1.name}】VS【奧義・${meta2.name}】`,
-          desc: `${meta1.effectDesc} • ${meta2.effectDesc}`,
+          title: `【${meta1.name}】⚔️【${meta2.name}】`,
+          desc: `${p1.name}：${meta1.effectDesc} | ${p2.name}：${meta2.effectDesc}`,
           color: meta1.bannerColor,
         });
 
-        // 啟動專屬粒子動畫
+        // 啟動專屬粒子特效
         setActiveChipAnim(chip1);
 
+        setStageDesc({
+          badge: "Round 3 晶片奧義對轟",
+          step: `【${meta1.name}】vs【${meta2.name}】`,
+          detail: `雙方同時施展專屬奧義！學科精熟光芒與勤勉突破烈焰正面對轟！`,
+        });
+
         const tR3_impact = setTimeout(() => {
-          setShakeIntensity(8); // 劇烈震屏 8px
+          setShakeIntensity(8); // 劇烈震屏
           retroAudio.playCrit();
 
           setFloatDamage1({ val: r3.damageToP1, isCrit: true });
@@ -246,39 +384,49 @@ export default function BattleArenaPlayer({
           setAction1(r3.damageToP1 >= r3.damageToP2 ? "hurt" : "attack");
           setAction2(r3.damageToP2 >= r3.damageToP1 ? "hurt" : "attack");
 
+          setStageDesc({
+            badge: "Round 3 晶片奧義對轟",
+            step: "💥 奧義震撼命中！勝負在此一舉！",
+            detail: `全螢幕高光衝擊！暴擊數值結算完成，雙方極限承受終極招式！`,
+          });
+
           const tR3_clean = setTimeout(() => {
             setShakeIntensity(0);
             setChipBanner(null);
             setActiveChipAnim(null);
             setFloatDamage1(null);
             setFloatDamage2(null);
-          }, 2000);
+          }, 2500);
           timersRef.current.push(tR3_clean);
-        }, 3000);
+        }, 3200);
         timersRef.current.push(tR3_impact);
-      }, 600);
+      }, 700);
       timersRef.current.push(tFlashEnd);
     }, 18000);
-    timersRef.current.push(tR3);
+    timersRef.current.push(tR3_start);
 
-    // ==========================================
-    // 00:28 - 00:33【終局結算】
-    // ==========================================
+    // =========================================================================
+    // 【終局結算 (27~30s)】
+    // =========================================================================
     const tFinish = setTimeout(() => {
       finishBattle();
-    }, 28000);
+    }, 27000);
     timersRef.current.push(tFinish);
   }
 
   function finishBattle() {
     clearTimers();
     setSeconds(30);
+    setCurrentStage(4);
     setIsPlaying(false);
     setFinished(true);
     setSuperFlash(false);
     setShakeIntensity(0);
     setChipBanner(null);
     setActiveChipAnim(null);
+    setProjectile(null);
+    setShieldActive1(false);
+    setShieldActive2(false);
     retroAudio.stopBGM();
 
     const final1 = p1.finalHp ?? 30;
@@ -286,25 +434,35 @@ export default function BattleArenaPlayer({
     setHp1(final1);
     setHp2(final2);
 
-    const winner = battleLog?.winner || (final1 > final2 ? "P1" : "P2");
-
-    if (winner === "P1") {
+    if (final1 > final2) {
       setAction1("win");
       setAction2("die");
       if (isMeP1) retroAudio.playVictory();
       else retroAudio.playDefeat();
-      setCommentary(`【推演結算】${p1.name} 奪得勝利！`);
-    } else if (winner === "P2") {
-      setAction2("win");
+      setStageDesc({
+        badge: "推演完成",
+        step: `👑【${p1.name}】奪得本週推演勝利！`,
+        detail: battleLog?.causalityAnalysis?.reasonForP1 || "週考成績優勢與晶片觸發關鍵制勝！",
+      });
+    } else if (final2 > final1) {
       setAction1("die");
+      setAction2("win");
       if (!isMeP1) retroAudio.playVictory();
       else retroAudio.playDefeat();
-      setCommentary(`【推演結算】${p2.name} 奪得勝利！`);
+      setStageDesc({
+        badge: "推演完成",
+        step: `👑【${p2.name}】奪得本週推演勝利！`,
+        detail: battleLog?.causalityAnalysis?.reasonForP2 || "防守得當且大招爆發，成功拿下對決！",
+      });
     } else {
       setAction1("win");
       setAction2("win");
       retroAudio.playDefeat();
-      setCommentary("【推演結算】雙方勢均力敵，握手言和！");
+      setStageDesc({
+        badge: "推演完成",
+        step: "🤝 雙方勢均力敵，握手言和！",
+        detail: "雙方實力相近，本週打成平手！",
+      });
     }
   }
 
@@ -331,7 +489,7 @@ export default function BattleArenaPlayer({
       className={`w-full bg-[#0b0f19] border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col text-slate-100 font-sans relative transition-transform duration-100 ${
         shakeIntensity === 2
           ? "translate-x-0.5 -translate-y-0.5"
-          : shakeIntensity === 4
+          : shakeIntensity === 3
           ? "translate-x-1 -translate-y-1"
           : shakeIntensity === 8
           ? "translate-x-2 -translate-y-2"
@@ -341,44 +499,77 @@ export default function BattleArenaPlayer({
       {/* Super Flash 全黑 0.6 秒 */}
       {superFlash && (
         <div className="absolute inset-0 bg-black z-50 flex items-center justify-center animate-fade-in">
-          <div className="text-amber-400 font-black text-2xl tracking-widest animate-pulse">
-            ⚡ SUPER FLASH
+          <div className="text-amber-400 font-black text-2xl sm:text-3xl tracking-widest animate-pulse flex items-center gap-2">
+            <span>⚡ SUPER FLASH 奧義引爆</span>
           </div>
         </div>
       )}
 
-      {/* 晶片專屬 Canvas/CSS 粒子特效層 */}
+      {/* 具象晶片特效層 */}
       {activeChipAnim && (
         <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden flex items-center justify-center">
+          {/* 幾何湮滅陣：藍白晶體陣列 + 貫穿光束 */}
           {activeChipAnim === "MATH_VOID" && (
-            <div className="w-full h-full bg-blue-500/10 flex items-center justify-center">
+            <div className="w-full h-full bg-blue-500/10 flex items-center justify-center relative">
               <div className="w-64 h-64 border-4 border-cyan-400 rotate-45 animate-spin duration-700 shadow-[0_0_50px_rgba(34,211,238,0.8)]" />
-              <div className="absolute inset-x-0 h-1 bg-white shadow-[0_0_20px_white] animate-pulse" />
+              <div className="absolute inset-x-0 h-2 bg-gradient-to-r from-transparent via-cyan-200 to-transparent shadow-[0_0_30px_cyan] animate-pulse" />
+              <div className="absolute text-cyan-200 text-xs font-mono font-bold tracking-widest top-1/3">
+                幾何晶體矩陣 • 穿透打擊
+              </div>
             </div>
           )}
+
+          {/* 千字筆墨斬：水墨漢字飛舞 */}
           {activeChipAnim === "CHINESE_INK" && (
-            <div className="w-full h-full bg-slate-900/40 flex items-center justify-center">
-              <div className="text-6xl font-serif text-amber-200/40 select-none animate-ping">墨</div>
+            <div className="w-full h-full bg-slate-900/40 flex items-center justify-center relative">
+              <div className="text-7xl font-serif text-amber-200/50 select-none animate-ping">斬</div>
+              <div className="absolute text-5xl font-serif text-slate-200/40 -left-10 animate-bounce">墨</div>
+              <div className="absolute text-5xl font-serif text-slate-200/40 -right-10 animate-bounce">破</div>
+              <div className="absolute bottom-1/3 text-amber-300 text-xs font-bold tracking-widest">
+                千字筆墨 • 吸血真實打擊
+              </div>
             </div>
           )}
+
+          {/* 逆境破甲焰：赤紅烈焰地裂 */}
           {activeChipAnim === "ADVERSITY_SHATTER" && (
-            <div className="w-full h-full bg-rose-500/15 flex items-center justify-center">
+            <div className="w-full h-full bg-rose-500/15 flex items-center justify-center relative">
               <div className="w-72 h-72 rounded-full border-4 border-rose-500 animate-ping shadow-[0_0_60px_rgba(244,63,94,0.9)]" />
+              <div className="absolute text-amber-300 font-black text-lg tracking-widest animate-bounce">
+                🔥 逆境破甲 +35% 超量暴擊！
+              </div>
             </div>
           )}
+
+          {/* 守護壁壘：玄武岩壁破土 */}
           {activeChipAnim === "GUARDIAN_BASTION" && (
-            <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center">
-              <div className="w-80 h-80 rounded-2xl border-4 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.8)]" />
+            <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center relative">
+              <div className="w-80 h-44 rounded-xl border-4 border-emerald-400 bg-emerald-950/60 shadow-[0_0_50px_rgba(52,211,153,0.8)] flex items-center justify-center">
+                <span className="text-emerald-300 font-bold text-sm tracking-wider">🛡️ 玄武壁壘 • 減傷50%並反彈</span>
+              </div>
             </div>
           )}
+
+          {/* 自我超越：黃金賽亞金光 */}
           {activeChipAnim === "SELF_TRANSCENDENCE" && (
-            <div className="w-full h-full bg-yellow-500/20 flex items-center justify-center">
-              <div className="w-full h-24 bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 shadow-[0_0_80px_gold] animate-pulse" />
+            <div className="w-full h-full bg-yellow-500/20 flex items-center justify-center relative">
+              <div className="w-full h-32 bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 shadow-[0_0_80px_gold] animate-pulse flex items-center justify-center">
+                <span className="text-slate-950 font-black text-base tracking-widest">👑 自我超越 • 必定暴擊爆發</span>
+              </div>
             </div>
           )}
+
+          {/* 律動疾風矢：三連射金箭 */}
           {activeChipAnim === "ENGLISH_STORM" && (
-            <div className="w-full h-full bg-amber-500/15 flex items-center justify-center">
-              <div className="w-full h-full border-t-4 border-b-4 border-amber-300 rotate-12 animate-pulse" />
+            <div className="w-full h-full bg-amber-500/15 flex items-center justify-center relative">
+              <div className="flex gap-4 animate-pulse">
+                <div className="w-20 h-1 bg-amber-300 shadow-[0_0_20px_gold]" />
+                <div className="w-20 h-1 bg-amber-300 shadow-[0_0_20px_gold]" />
+                <div className="w-20 h-1 bg-amber-300 shadow-[0_0_20px_gold]" />
+              </div>
+              <div className="absolute bottom-1/3 text-amber-300 text-xs font-bold tracking-widest">
+                疾風三連光矢 • 削弱敵方攻擊力
+              </div>
             </div>
           )}
         </div>
@@ -387,22 +578,40 @@ export default function BattleArenaPlayer({
       {/* 晶片大招金色橫幅 */}
       {chipBanner && (
         <div className="absolute top-1/4 left-0 right-0 z-40 flex flex-col items-center justify-center px-4 animate-in zoom-in duration-300">
-          <div className={`w-full max-w-md bg-gradient-to-r ${chipBanner.color} text-white py-3 px-5 rounded-xl border border-white/40 shadow-2xl text-center`}>
-            <p className="font-bold text-base sm:text-lg tracking-wider text-amber-200">{chipBanner.title}</p>
-            <p className="text-[11px] text-white/90 mt-0.5">{chipBanner.desc}</p>
+          <div className={`w-full max-w-md bg-gradient-to-r ${chipBanner.color} text-white py-3.5 px-6 rounded-xl border border-white/50 shadow-2xl text-center space-y-1`}>
+            <p className="font-extrabold text-base sm:text-lg tracking-wider text-amber-200 drop-shadow-md">
+              {chipBanner.title}
+            </p>
+            <p className="text-xs text-white/95 leading-relaxed">{chipBanner.desc}</p>
           </div>
         </div>
       )}
 
-      {/* 頂部操作列 */}
-      <div className="px-4 py-2.5 bg-[#070b14] border-b border-slate-800 flex items-center justify-between gap-3 text-xs z-20">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40 text-[11px]">
-            {seconds < 8 ? "ROUND 1 試探" : seconds < 18 ? "ROUND 2 升溫" : seconds < 28 ? "ROUND 3 奧義" : "FINISH"}
-          </span>
-          <span className="text-slate-300 text-xs font-semibold">
-            30 秒學力推演回放 ({seconds}s / 30s)
-          </span>
+      {/* 頂部操作列與階段進度條 */}
+      <div className="px-4 py-2.5 bg-[#070b14] border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs z-20">
+        {/* 四階段步驟指示器 */}
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold overflow-x-auto">
+          {[
+            { stage: 1, label: "1. 試探普攻" },
+            { stage: 2, label: "2. 作業護盾" },
+            { stage: 3, label: "3. 晶片奧義" },
+            { stage: 4, label: "4. 推演結算" },
+          ].map((st) => (
+            <div
+              key={st.stage}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 transition-colors ${
+                currentStage === st.stage
+                  ? "bg-indigo-600 text-white font-bold"
+                  : currentStage > st.stage
+                  ? "bg-slate-800 text-emerald-400"
+                  : "bg-slate-900 text-slate-500"
+              }`}
+            >
+              <span>{st.label}</span>
+              {currentStage > st.stage && <CheckCircle2 className="w-3 h-3" />}
+            </div>
+          ))}
+          <span className="font-mono text-slate-400 ml-1">({seconds}s/30s)</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -411,7 +620,7 @@ export default function BattleArenaPlayer({
             <button
               type="button"
               onClick={handleSkip}
-              className="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded text-xs flex items-center gap-1 shadow-sm transition-all"
+              className="px-3 py-1 bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-bold rounded-md text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
             >
               <FastForward className="w-3.5 h-3.5 fill-current" />
               <span>跳過動畫 (Skip)</span>
@@ -425,6 +634,7 @@ export default function BattleArenaPlayer({
             className={`px-2 py-1 rounded text-xs border ${
               soundEnabled ? "bg-slate-800 text-cyan-400 border-cyan-500/40" : "bg-slate-800 text-slate-400 border-slate-700"
             }`}
+            title="音效開關"
           >
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
@@ -433,7 +643,7 @@ export default function BattleArenaPlayer({
           <button
             type="button"
             onClick={startSimulation}
-            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded border border-slate-700 text-xs flex items-center gap-1"
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded border border-slate-700 text-xs flex items-center gap-1 transition-colors"
           >
             <RotateCcw className="w-3 h-3" />
             <span>重播</span>
@@ -452,15 +662,15 @@ export default function BattleArenaPlayer({
       </div>
 
       {/* 雙方血量指示條 */}
-      <div className="px-6 py-3 bg-[#0d1424] border-b border-slate-800/80 grid grid-cols-2 gap-6 relative z-10">
+      <div className="px-5 sm:px-8 py-3 bg-[#0d1424] border-b border-slate-800/80 grid grid-cols-2 gap-6 relative z-10">
         {/* P1 */}
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-white flex items-center gap-1">
+            <span className="font-bold text-white flex items-center gap-1.5 truncate">
               <span>{p1.name}</span>
               <span className="text-[10px] text-slate-400 font-mono">({p1.studentNumber})</span>
             </span>
-            <span className="font-mono text-emerald-400 font-bold">{hp1} / {initialHp1} HP</span>
+            <span className="font-mono text-emerald-400 font-bold shrink-0">{hp1} / {initialHp1} HP</span>
           </div>
           <div className="w-full h-2.5 bg-slate-900 rounded-full border border-slate-700 overflow-hidden">
             <div
@@ -468,18 +678,23 @@ export default function BattleArenaPlayer({
               style={{ width: `${Math.max(0, (hp1 / initialHp1) * 100)}%` }}
             />
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-0.5">
-            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40">
-              {meta1.icon} {meta1.name}
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 pt-0.5">
+            <span className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 font-semibold truncate">
+              {meta1.name}
             </span>
+            {p1.hasHomeworkCompleted && (
+              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                🛡️ 護盾中
+              </span>
+            )}
           </div>
         </div>
 
         {/* P2 */}
         <div className="space-y-1 text-right">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-mono text-rose-400 font-bold">{hp2} / {initialHp2} HP</span>
-            <span className="font-bold text-white flex items-center gap-1">
+            <span className="font-mono text-rose-400 font-bold shrink-0">{hp2} / {initialHp2} HP</span>
+            <span className="font-bold text-white flex items-center justify-end gap-1.5 truncate">
               <span className="text-[10px] text-slate-400 font-mono">({p2.studentNumber})</span>
               <span>{p2.name}</span>
             </span>
@@ -490,90 +705,145 @@ export default function BattleArenaPlayer({
               style={{ width: `${Math.max(0, (hp2 / initialHp2) * 100)}%` }}
             />
           </div>
-          <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 pt-0.5">
-            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40">
-              {meta2.icon} {meta2.name}
+          <div className="flex items-center justify-end gap-1.5 text-[10px] text-slate-400 pt-0.5">
+            {p2.hasHomeworkCompleted && (
+              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                🛡️ 護盾中
+              </span>
+            )}
+            <span className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40 font-semibold truncate">
+              {meta2.name}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 擂台主畫面 */}
-      <div className="h-60 sm:h-64 bg-gradient-to-b from-[#0a0f1d] via-[#10192e] to-[#0d1322] relative flex items-center justify-between px-10 sm:px-20 overflow-hidden">
-        {/* 背景格線 */}
+      {/* 擂台主畫面 (具備彈道、護盾與打擊動畫) */}
+      <div className="h-64 sm:h-72 bg-gradient-to-b from-[#0a0f1d] via-[#10192e] to-[#0d1322] relative flex items-center justify-between px-8 sm:px-20 overflow-hidden">
+        {/* 背景格線與地板反射 */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
 
-        {/* P1 精靈 */}
+        {/* 斬擊彈道特效 (Projectile) */}
+        {projectile === "p1_to_p2" && (
+          <div className="absolute left-1/4 top-1/2 -translate-y-1/2 z-30 animate-[ping_0.5s_cubic-bezier(0,0,0.2,1)_infinite] flex items-center">
+            <div className="w-24 sm:w-40 h-2 bg-gradient-to-r from-transparent via-cyan-400 to-white shadow-[0_0_20px_cyan] rounded-full rotate-[-10deg]" />
+          </div>
+        )}
+        {projectile === "p2_to_p1" && (
+          <div className="absolute right-1/4 top-1/2 -translate-y-1/2 z-30 animate-[ping_0.5s_cubic-bezier(0,0,0.2,1)_infinite] flex items-center">
+            <div className="w-24 sm:w-40 h-2 bg-gradient-to-l from-transparent via-rose-400 to-white shadow-[0_0_20px_rose] rounded-full rotate-[10deg]" />
+          </div>
+        )}
+
+        {/* P1 選手區域 */}
         <div className="relative flex flex-col items-center">
+          {/* 護盾特效環 */}
+          {shieldActive1 && (
+            <div className="absolute -inset-4 rounded-full border-4 border-emerald-400/80 bg-emerald-500/10 shadow-[0_0_30px_rgba(52,211,153,0.7)] animate-pulse z-20 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-emerald-300 bg-slate-950/80 px-2 py-0.5 rounded-full border border-emerald-400 -top-6 absolute">
+                🛡️ 作業護盾格擋！
+              </span>
+            </div>
+          )}
+
+          {/* 傷害跳字 */}
           {floatDamage1 && (
-            <div className={`absolute -top-10 font-mono font-black z-30 ${floatDamage1.isCrit ? "text-xl text-amber-300 animate-bounce" : "text-lg text-rose-400"}`}>
+            <div className={`absolute -top-12 font-mono font-black z-30 ${floatDamage1.isCrit ? "text-2xl text-amber-300 animate-bounce drop-shadow-[0_0_10px_gold]" : "text-lg text-rose-400"}`}>
               {floatDamage1.isCrit ? `CRITICAL! -${floatDamage1.val}` : `-${floatDamage1.val}`}
             </div>
           )}
+
           <PixelFighterSprite
             gender={p1.gender}
             action={action1}
             isOpponent={false}
-            size={105}
+            size={110}
           />
-          <span className="mt-1 text-[11px] font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+
+          <span className="mt-1 text-xs font-bold text-slate-200 bg-slate-950/90 px-2.5 py-0.5 rounded border border-slate-700">
             {p1.name}
           </span>
         </div>
 
-        {/* 中央 VS */}
+        {/* 中央 VS 核心 */}
         <div className="text-center z-10 space-y-1">
-          <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-amber-400 text-xs mx-auto shadow-inner">
+          <div className="w-9 h-9 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-amber-400 text-xs mx-auto shadow-inner">
             VS
           </div>
-          <span className="text-[10px] font-mono text-slate-400 bg-slate-950/70 px-2 py-0.5 rounded border border-slate-800">
-            {seconds}s
+          <span className="text-[10px] font-mono text-slate-400 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+            R{currentStage}
           </span>
         </div>
 
-        {/* P2 精靈 */}
+        {/* P2 選手區域 */}
         <div className="relative flex flex-col items-center">
+          {/* 護盾特效環 */}
+          {shieldActive2 && (
+            <div className="absolute -inset-4 rounded-full border-4 border-emerald-400/80 bg-emerald-500/10 shadow-[0_0_30px_rgba(52,211,153,0.7)] animate-pulse z-20 flex items-center justify-center">
+              <span className="text-[10px] font-bold text-emerald-300 bg-slate-950/80 px-2 py-0.5 rounded-full border border-emerald-400 -top-6 absolute">
+                🛡️ 作業護盾格擋！
+              </span>
+            </div>
+          )}
+
+          {/* 傷害跳字 */}
           {floatDamage2 && (
-            <div className={`absolute -top-10 font-mono font-black z-30 ${floatDamage2.isCrit ? "text-xl text-amber-300 animate-bounce" : "text-lg text-rose-400"}`}>
+            <div className={`absolute -top-12 font-mono font-black z-30 ${floatDamage2.isCrit ? "text-2xl text-amber-300 animate-bounce drop-shadow-[0_0_10px_gold]" : "text-lg text-rose-400"}`}>
               {floatDamage2.isCrit ? `CRITICAL! -${floatDamage2.val}` : `-${floatDamage2.val}`}
             </div>
           )}
+
           <PixelFighterSprite
             gender={p2.gender}
             action={action2}
             isOpponent={true}
-            size={105}
+            size={110}
           />
-          <span className="mt-1 text-[11px] font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+
+          <span className="mt-1 text-xs font-bold text-slate-200 bg-slate-950/90 px-2.5 py-0.5 rounded border border-slate-700">
             {p2.name}
           </span>
         </div>
       </div>
 
-      {/* 下方戰況解說 */}
-      <div className="px-4 py-2 bg-[#070b14] border-t border-slate-800 text-xs text-amber-300 flex items-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-        <span className="font-mono truncate">{commentary}</span>
+      {/* 下方清爽文字戰況解說看板 (Clear Multi-line Commentary) */}
+      <div className="px-5 py-3.5 bg-[#070b14] border-t border-slate-800 flex items-start gap-3">
+        <div className="p-2 rounded-lg bg-indigo-950/80 border border-indigo-500/40 shrink-0 text-indigo-300 mt-0.5">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+        </div>
+        <div className="space-y-0.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-900/60 text-indigo-200 border border-indigo-700/60 font-mono">
+              {stageDesc.badge}
+            </span>
+            <span className="text-xs sm:text-sm font-bold text-amber-300 truncate">
+              {stageDesc.step}
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 font-sans leading-relaxed">
+            {stageDesc.detail}
+          </p>
+        </div>
       </div>
 
-      {/* 終局結算卡片 */}
+      {/* 終局結算因果分析卡片 */}
       {finished && (
-        <div className="p-5 bg-slate-900 border-t-2 border-amber-400 flex flex-col items-center text-center space-y-3 animate-in fade-in duration-300">
+        <div className="p-6 bg-slate-900 border-t-2 border-amber-400 flex flex-col items-center text-center space-y-4 animate-in fade-in duration-300">
           <div className="flex items-center gap-2">
-            <Trophy className={`w-6 h-6 ${isWinnerMe ? "text-amber-400" : isDraw ? "text-cyan-400" : "text-slate-500"}`} />
-            <h3 className="text-xl font-bold text-white tracking-wider">
-              {isWinnerMe ? "👑 VICTORY • 推演勝出！" : isDraw ? "🤝 DRAW • 勢均力敵！" : "⚔️ DEFEAT • 本週惜敗"}
+            <Trophy className={`w-7 h-7 ${isWinnerMe ? "text-amber-400" : isDraw ? "text-cyan-400" : "text-slate-500"}`} />
+            <h3 className="text-xl sm:text-2xl font-black text-white tracking-wider">
+              {isWinnerMe ? "👑 VICTORY • 本週推演勝出！" : isDraw ? "🤝 DRAW • 勢均力敵！" : "⚔️ DEFEAT • 本週惜敗"}
             </h3>
           </div>
 
-          <div className="w-full max-w-lg bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-left space-y-1.5">
-            <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5" />
+          <div className="w-full max-w-xl bg-slate-950/90 border border-slate-800 rounded-xl p-4 text-left space-y-2 shadow-inner">
+            <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+              <Zap className="w-4 h-4" />
               <span>推演勝負因果分析報告</span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed font-sans">
-              {causalityReason || "努力完成作業與自主修練題目，解鎖核心晶片優勢。"}
+            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+              {causalityReason || "努力完成作業啟用減傷護盾，並在自主修練中解鎖翻盤晶片。"}
             </p>
           </div>
 
@@ -581,17 +851,17 @@ export default function BattleArenaPlayer({
             <button
               type="button"
               onClick={startSimulation}
-              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-bold transition-colors"
+              className="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
             >
-              再次回放
+              再次回放 (Replay)
             </button>
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded text-xs transition-colors"
+                className="px-6 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-lg text-xs transition-colors cursor-pointer"
               >
-                返回看板
+                返回學力看板
               </button>
             )}
           </div>

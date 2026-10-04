@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Sparkles, GraduationCap } from "lucide-react";
 
 export default function StudentHomePage() {
   const router = useRouter();
@@ -26,62 +26,69 @@ export default function StudentHomePage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-140px)] flex flex-col justify-center items-center px-4 py-8">
-      {/* 畫面正中央：極簡遊戲大廳入口 */}
-      <div className="w-full max-w-md text-center space-y-7 my-auto">
-        {/* 遊戲標題 */}
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700/80 text-[11px] text-amber-400 font-pixel shadow-sm mb-1">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>SEASON 1 • 冒險者集結</span>
+    <div className="min-h-[calc(100vh-120px)] flex flex-col justify-center items-center px-4 py-8 bg-slate-50">
+      {/* 畫面正中央：現代簡潔 SaaS 登入卡片 */}
+      <div className="w-full max-w-md bg-white border border-slate-200 shadow-sm rounded-2xl p-6 sm:p-8 space-y-6 text-center my-auto">
+        {/* 平台標題與徽章 */}
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+            <span>國英數週考 • 親師生透明看板</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-wider flex items-center justify-center gap-2.5">
-            <span>⚔️</span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500">
-              數學戰力擂台
-            </span>
+
+          <div className="w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center mx-auto shadow-sm">
+            <GraduationCap className="w-6 h-6" />
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            週考成績平台
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 font-sans tracking-wide">
-            小六週考遊戲化冒險者對決
+
+          <p className="text-xs sm:text-sm text-slate-500 font-sans">
+            國英數學力成長曲線 • 作業護盾 • 自主修練推演
           </p>
         </div>
 
-        {/* 學號輸入與進入大廳按鈕 */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="relative">
+        {/* 學號輸入表單 */}
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+          <div>
+            <label htmlFor="student-input" className="block text-xs font-bold text-slate-700 mb-1.5 text-left">
+              請輸入學生學號
+            </label>
             <input
+              id="student-input"
               type="text"
               value={studentNumber}
               onChange={(e) => setStudentNumber(e.target.value)}
-              placeholder="請輸入學號 (例：S101)"
-              className="w-full bg-[#0d1322] border-2 border-slate-700 focus:border-amber-400 focus:outline-none text-center text-white text-lg sm:text-xl font-mono py-3.5 px-4 rounded-xl shadow-inner placeholder:text-slate-500 uppercase tracking-widest transition-colors"
+              placeholder="例如：S101"
+              className="w-full bg-slate-50 border border-slate-300 focus:border-indigo-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-100 text-center text-slate-900 text-lg sm:text-xl font-mono py-3 px-4 rounded-xl placeholder:text-slate-400 uppercase tracking-widest transition-all font-semibold"
               autoFocus
             />
           </div>
 
           {errorMsg && (
-            <p className="text-xs text-rose-400 font-medium">{errorMsg}</p>
+            <p className="text-xs text-rose-600 font-medium">{errorMsg}</p>
           )}
 
-          {/* 醒目的黃色按鈕 */}
+          {/* 醒目的進入按鈕 */}
           <button
             type="submit"
-            className="w-full py-3.5 sm:py-4 bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-slate-950 font-black text-base sm:text-lg tracking-wider rounded-xl shadow-lg shadow-amber-400/20 hover:shadow-amber-400/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white font-bold text-sm sm:text-base tracking-wide rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <span>進入大廳</span>
-            <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+            <span>進入學力看板</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        {/* 快速示範選取 (方便快速測試) */}
-        <div className="pt-2 flex items-center justify-center gap-2 flex-wrap text-xs text-slate-500">
-          <span>快速體驗：</span>
+        {/* 快速示範選取 */}
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1.5 flex-wrap text-xs text-slate-400">
+          <span className="text-slate-500 font-medium">快速測試：</span>
           {["S101", "S102", "S104", "S109"].map((num) => (
             <button
               key={num}
               type="button"
               onClick={() => handleQuickSelect(num)}
-              className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-400/50 font-mono transition-colors"
+              className="px-2.5 py-1 rounded-md bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 border border-slate-200 font-mono text-xs font-semibold transition-colors"
             >
               {num}
             </button>
@@ -91,4 +98,3 @@ export default function StudentHomePage() {
     </div>
   );
 }
-
