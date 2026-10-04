@@ -21,8 +21,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ week: null, records: [], students: [] });
     }
 
-    // 取得所有學生
+    // 取得所有學生 (排除 BOT)
     const students = await prisma.student.findMany({
+      where: {
+        studentNumber: { not: "BOT-999" },
+      },
       orderBy: { studentNumber: "asc" },
     });
 
@@ -32,7 +35,7 @@ export async function GET(req: NextRequest) {
       include: { student: true },
     });
 
-    // 若有學生尚未有當週記錄，自動補建 (completed)
+    // 若有學生尚未有當週記錄，自動補建 (COMPLETED)
     const existingStudentIds = new Set(records.map((r) => r.studentId));
     const missingStudents = students.filter((s) => !existingStudentIds.has(s.id));
 
@@ -42,9 +45,8 @@ export async function GET(req: NextRequest) {
           data: {
             weekId: targetWeek.id,
             studentId: s.id,
-            status: "completed",
+            status: "COMPLETED",
             missingScope: null,
-            hasBuff: true,
           },
           include: { student: true },
         });
@@ -57,18 +59,20 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       week: targetWeek,
-      records: records.map((r) => ({
-        id: r.id,
-        weekId: r.weekId,
-        studentId: r.studentId,
-        studentNumber: r.student.studentNumber,
-        name: r.student.name,
-        avatarId: r.student.avatarId,
-        parentPhone: r.student.parentPhone,
-        status: r.status,
-        missingScope: r.missingScope,
-        hasBuff: r.hasBuff,
-      })),
+      records: records.map((r) => {
+        const upperStatus = (r.status || "COMPLETED").toUpperCase();
+        return {
+          id: r.id,
+          weekId: r.weekId,
+          studentId: r.studentId,
+          studentNumber: r.student.studentNumber,
+          name: r.student.name,
+          gender: r.student.gender,
+          status: upperStatus.toLowerCase(), // 前端支援 completed / missing / partial
+          missingScope: r.missingScope,
+          hasBuff: upperStatus === "COMPLETED",
+        };
+      }),
     });
   } catch (error: any) {
     console.error("GET /api/admin/homework error:", error);
@@ -93,27 +97,25 @@ export async function PUT(req: NextRequest) {
     // 支援單筆更新
     if (singleUpdate) {
       const { studentId, status, missingScope } = singleUpdate;
-      const isCompleted = status === "completed";
-      const hasBuff = isCompleted;
+      const upperStatus = (status || "COMPLETED").toUpperCase();
+      const isCompleted = upperStatus === "COMPLETED";
 
       const updated = await prisma.homeworkRecord.upsert({
         where: {
-          weekId_studentId: {
-            weekId,
+          studentId_weekId: {
             studentId,
+            weekId,
           },
         },
         update: {
-          status,
+          status: upperStatus,
           missingScope: isCompleted ? null : missingScope || null,
-          hasBuff,
         },
         create: {
           weekId,
           studentId,
-          status,
+          status: upperStatus,
           missingScope: isCompleted ? null : missingScope || null,
-          hasBuff,
         },
       });
 
@@ -123,25 +125,24 @@ export async function PUT(req: NextRequest) {
     // 支援批次更新
     if (Array.isArray(records)) {
       for (const item of records) {
-        const isCompleted = item.status === "completed";
+        const upperStatus = (item.status || "COMPLETED").toUpperCase();
+        const isCompleted = upperStatus === "COMPLETED";
         await prisma.homeworkRecord.upsert({
           where: {
-            weekId_studentId: {
-              weekId,
+            studentId_weekId: {
               studentId: item.studentId,
+              weekId,
             },
           },
           update: {
-            status: item.status,
+            status: upperStatus,
             missingScope: isCompleted ? null : item.missingScope || null,
-            hasBuff: isCompleted,
           },
           create: {
             weekId,
             studentId: item.studentId,
-            status: item.status,
+            status: upperStatus,
             missingScope: isCompleted ? null : item.missingScope || null,
-            hasBuff: isCompleted,
           },
         });
       }

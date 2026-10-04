@@ -77,6 +77,18 @@ export default function AdminLayout({
                 </Link>
 
                 <Link
+                  href="/admin/quests"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                    pathname.startsWith("/admin/quests")
+                      ? "bg-indigo-50 text-indigo-700"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  }`}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>自主修練出題</span>
+                </Link>
+
+                <Link
                   href="/admin/weeks"
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                     pathname.startsWith("/admin/weeks")
@@ -87,42 +99,18 @@ export default function AdminLayout({
                   <Calendar className="w-3.5 h-3.5" />
                   <span>週次進度管理</span>
                 </Link>
-
-                <Link
-                  href="/admin/challenges"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    pathname.startsWith("/admin/challenges")
-                      ? "bg-indigo-50 text-indigo-700"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>錯題挑戰題庫</span>
-                </Link>
-
-                <Link
-                  href="/admin/words"
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    pathname.startsWith("/admin/words")
-                      ? "bg-indigo-50 text-indigo-700"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>單字庫管理</span>
-                </Link>
               </nav>
             </div>
 
             {/* Right: Quick Preview & Actions */}
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                href="/portal/S101"
                 target="_blank"
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors"
-                title="在新分頁開啟學生對戰端"
+                title="在新分頁開啟學生整合看板"
               >
-                <span>學生對戰端預覽</span>
+                <span>學生看板預覽 (S101)</span>
                 <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
               </Link>
 

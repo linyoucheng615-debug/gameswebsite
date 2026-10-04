@@ -11,30 +11,33 @@ import {
   ExternalLink,
   Users,
   Shield,
-  ArrowRight,
+  Flame,
 } from "lucide-react";
-import { AcademicWeek, BattleLog } from "@/types";
+import { AcademicWeek } from "@/types";
 
 interface SettleStudent {
   id: string;
   studentNumber: string;
   name: string;
-  avatarId: string;
+  gender: string;
   hasBuff: boolean;
   homeworkStatus: string;
-  existingScore: number | null;
-  existingPower: number | null;
+  chineseScore: number | null;
+  englishScore: number | null;
+  mathScore: number | null;
+  averageScore: number | null;
+  previousAverage: number | null;
+  hasUnlockedChip: boolean;
+  equippedChip: string | null;
 }
 
 interface SettleMatch {
   id: string;
-  playerA: any;
-  playerB: any;
-  botName?: string;
-  botPower?: number;
-  winner?: any;
+  player1: any;
+  player2: any;
+  winnerId?: string | null;
   isDraw: boolean;
-  battleLog: BattleLog;
+  battleLog: any;
 }
 
 export default function AdminSettlePage() {
@@ -94,12 +97,12 @@ export default function AdminSettlePage() {
       S101: [96, 98, 95],
       S102: [94, 96, 95],
       S103: [92, 90, 94],
-      S104: [88, 86, 90], // 缺交作業 (+0)
+      S104: [88, 86, 90],
       S105: [89, 92, 86],
       S106: [87, 88, 86],
       S107: [86, 85, 87],
       S108: [84, 82, 86],
-      S109: [83, 85, 81], // 需訂正 (+0)
+      S109: [83, 85, 81],
       S110: [85, 84, 86],
       S111: [82, 80, 84],
       S112: [80, 82, 78],
@@ -108,16 +111,16 @@ export default function AdminSettlePage() {
       S115: [78, 80, 76],
       S116: [77, 75, 79],
       S117: [76, 78, 74],
-      S118: [75, 73, 77], // 缺交 (+0)
+      S118: [75, 73, 77],
       S119: [75, 76, 74],
       S120: [74, 72, 76],
       S121: [73, 75, 71],
-      S122: [72, 70, 74], // 部分 (+0)
+      S122: [72, 70, 74],
       S123: [71, 73, 69],
       S124: [70, 68, 72],
       S125: [69, 71, 67],
       S126: [68, 66, 70],
-      S127: [67, 69, 65], // 缺交 (+0)
+      S127: [67, 69, 65],
       S128: [66, 64, 68],
       S129: [65, 67, 63],
       S130: [64, 62, 66],
@@ -180,13 +183,13 @@ export default function AdminSettlePage() {
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">
             <Zap className="w-4 h-4" />
-            <span>週考戰力結算中心</span>
+            <span>週考戰力推演結算中心</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            實力相近配對與戰鬥生成
+            30 秒學力推演配對與結算
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            系統依照全班「最終有效戰力」由高至低嚴格排序，兩兩相鄰自動成組，生成 5~7 秒 2D 像素戰鬥日誌。
+            系統依照全班週考平均成績排序，兩兩相鄰自動成組，模擬 3 回合 30 秒推演（普攻試探 ➔ 作業護盾 ➔ 雙軌晶片大招對轟）。
           </p>
         </div>
 
@@ -247,7 +250,7 @@ export default function AdminSettlePage() {
             </div>
 
             <p className="text-[11px] text-slate-500">
-              支援「學號 國文 英文 數學」或「學號 單科」或 CSV 格式（例：<code className="text-indigo-600 bg-slate-100 px-1 py-0.5 rounded font-mono">S101 92 95 90</code>）：
+              支援「學號 國文 英文 數學」格式（例：<code className="text-indigo-600 bg-slate-100 px-1 py-0.5 rounded font-mono">S101 96 98 95</code>）：
             </p>
 
             <textarea
@@ -261,7 +264,7 @@ export default function AdminSettlePage() {
 
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
               <div className="text-[11px] text-slate-500">
-                作業完成 <strong className="text-emerald-700 font-semibold">+10 護盾</strong> / 錯題全對 <strong className="text-amber-600 font-semibold">+15 奧義</strong>
+                按時繳作業 <strong className="text-emerald-700 font-semibold">+10 護盾</strong> / 自主修練 <strong className="text-amber-600 font-semibold">解鎖晶片</strong>
               </div>
 
               <button
@@ -271,7 +274,7 @@ export default function AdminSettlePage() {
                 className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs rounded-md shadow-sm transition-all disabled:opacity-50"
               >
                 <Swords className="w-4 h-4" />
-                <span>{submitting ? "計算與結算中..." : "一鍵實力配對與結算"}</span>
+                <span>{submitting ? "計算與結算中..." : "一鍵 30 秒學力推演結算"}</span>
               </button>
             </div>
           </div>
@@ -280,12 +283,13 @@ export default function AdminSettlePage() {
           <div className="bg-slate-100/70 border border-slate-200/80 rounded-lg p-4 text-xs text-slate-600 space-y-1.5">
             <div className="font-semibold text-slate-800 flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-indigo-600" />
-              <span>演算法規則：</span>
+              <span>30 秒推演演算法規則：</span>
             </div>
-            <p>1. 基礎血量 = 週考三科平均成績；有效戰力 = 三科平均 + (作業準時 ? 10 : 0) + (錯題全對 ? 15 : 0) + (進步幅度 * 1.5)。</p>
-            <p>2. 嚴格由高至低排序，相鄰成對（1v2, 3v4 ...）。</p>
-            <p>3. 奇數人數自動生成同分段平均戰力「守門機器人」。</p>
-            <p>4. 35 秒 3 回合演繹：普攻試探 ➔ 學科絕技 ➔ 逆轉奧義 Super Flash (-50 暴擊)。</p>
+            <p>1. 初始血量 = 週考三科平均分（35 ~ 100 HP）。</p>
+            <p>2. Round 1 (0~8s)：試探普攻（扣血 12~18）。</p>
+            <p>3. Round 2 (8~18s)：戰況升溫（作業完成獲 15% 減傷護盾）。</p>
+            <p>4. Round 3 (18~28s)：晶片大招對轟（Super Flash 全黑、暴擊跳字、學霸精熟陣 vs 弱者逆境破甲 +35% 翻盤）。</p>
+            <p>5. 奇數人數自動生成替身武士補齊對戰。</p>
           </div>
         </div>
 
@@ -314,15 +318,25 @@ export default function AdminSettlePage() {
                 <Swords className="w-8 h-8 text-slate-300 mx-auto" />
                 <p>本週尚未執行對戰結算</p>
                 <p className="text-[11px] text-slate-400">
-                  請在左側貼入成績文字後，點擊「一鍵實力配對與結算」。
+                  請在左側貼入成績文字後，點擊「一鍵 30 秒學力推演結算」。
                 </p>
               </div>
             ) : (
               <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1">
                 {matches.map((m, idx) => {
-                  const log = m.battleLog;
-                  const pA = log.playerA;
-                  const pB = log.playerB;
+                  const log = m.battleLog || {};
+                  const p1 = log.p1 || {
+                    name: m.player1?.name || "選手 1",
+                    studentNumber: m.player1?.studentNumber || "",
+                    averageScore: 75,
+                    chipName: "裝備晶片",
+                  };
+                  const p2 = log.p2 || {
+                    name: m.player2?.name || "選手 2",
+                    studentNumber: m.player2?.studentNumber || "",
+                    averageScore: 75,
+                    chipName: "裝備晶片",
+                  };
 
                   return (
                     <div
@@ -349,19 +363,22 @@ export default function AdminSettlePage() {
 
                       {/* 雙方戰力比較列 */}
                       <div className="grid grid-cols-11 items-center gap-2">
-                        {/* 選手 A */}
+                        {/* 選手 1 */}
                         <div className="col-span-5 p-2 bg-white rounded border border-slate-200">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-slate-900 truncate">
-                              {pA.name} ({pA.studentNumber})
+                              {p1.name} ({p1.studentNumber})
                             </span>
                             <span className="font-mono font-bold text-indigo-700">
-                              {pA.effectivePower}分
+                              {p1.averageScore}分
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
-                            <span>卷面 {pA.rawScore}</span>
-                            <span>{pA.buff > 0 ? "+5 護盾" : "+0"}</span>
+                          <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                            <span className="bg-slate-100 px-1 py-0.5 rounded flex items-center gap-0.5 truncate max-w-[100px]">
+                              <Flame className="w-2.5 h-2.5 text-amber-500" />
+                              {p1.chipName}
+                            </span>
+                            <span>{p1.hasHomeworkCompleted ? "+護盾" : "無護盾"}</span>
                           </div>
                         </div>
 
@@ -370,45 +387,48 @@ export default function AdminSettlePage() {
                           VS
                         </div>
 
-                        {/* 選手 B */}
+                        {/* 選手 2 */}
                         <div className="col-span-5 p-2 bg-white rounded border border-slate-200">
                           <div className="flex items-center justify-between text-xs">
                             <span className="font-bold text-slate-900 truncate">
-                              {pB.name} {pB.isBot ? "[機器人]" : `(${pB.studentNumber})`}
+                              {p2.name} ({p2.studentNumber})
                             </span>
                             <span className="font-mono font-bold text-indigo-700">
-                              {pB.effectivePower}分
+                              {p2.averageScore}分
                             </span>
                           </div>
-                          <div className="text-[10px] text-slate-400 mt-0.5 flex items-center justify-between">
-                            <span>卷面 {pB.rawScore}</span>
-                            <span>{pB.buff > 0 ? "+5 護盾" : "+0"}</span>
+                          <div className="text-[10px] text-slate-500 mt-1 flex items-center justify-between">
+                            <span className="bg-slate-100 px-1 py-0.5 rounded flex items-center gap-0.5 truncate max-w-[100px]">
+                              <Flame className="w-2.5 h-2.5 text-amber-500" />
+                              {p2.chipName}
+                            </span>
+                            <span>{p2.hasHomeworkCompleted ? "+護盾" : "無護盾"}</span>
                           </div>
                         </div>
                       </div>
 
-                      {/* 戰鬥動畫預覽捷徑 */}
+                      {/* 前台預覽捷徑 */}
                       <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px]">
                         <span className="text-slate-500 truncate max-w-xs">
-                          {log.summary}
+                          {log.causalityAnalysis?.reasonForP1 || "30 秒學力推演完成"}
                         </span>
 
                         <div className="flex items-center gap-2">
                           <Link
-                            href={`/battle/${pA.studentNumber}`}
+                            href={`/portal/${p1.studentNumber}`}
                             target="_blank"
                             className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
                           >
-                            <span>預覽 {pA.name}</span>
+                            <span>預覽 {p1.name} 看板</span>
                             <ExternalLink className="w-3 h-3" />
                           </Link>
-                          {!pB.isBot && (
+                          {p2.studentNumber && !p2.studentNumber.startsWith("BOT") && (
                             <Link
-                              href={`/battle/${pB.studentNumber}`}
+                              href={`/portal/${p2.studentNumber}`}
                               target="_blank"
                               className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-medium"
                             >
-                              <span>預覽 {pB.name}</span>
+                              <span>預覽 {p2.name} 看板</span>
                               <ExternalLink className="w-3 h-3" />
                             </Link>
                           )}

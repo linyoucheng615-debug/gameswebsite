@@ -1,497 +1,291 @@
-import { BattleFighter, BattleLog, BattleStep } from "@/types";
-import { getAvatarMeta } from "@/lib/avatars";
+import { BattleLog } from "@/types";
+import { ChipId, TACTICAL_CHIPS } from "@/lib/chips";
 
 export interface StudentInputScore {
   studentNumber: string;
   name: string;
-  avatarId: string;
+  gender: "BOY" | "GIRL";
   studentId: string;
-  rawScore: number;
-  chineseScore?: number;
-  englishScore?: number;
-  mathScore?: number;
-  averageScore?: number;
-  previousAverage?: number;
-  hasHomeworkBuff: boolean; // 作業準時完成 (+10 戰力, 開局 +1 氣)
-  allChallengesCorrect?: boolean; // 作業三題挑戰全對 (+15 戰力, 奧義就緒)
-  skin?: {
-    gender: "boy" | "girl";
-    charClass: "warrior" | "mage" | "ranger" | "assassin";
-    color: "blue" | "red" | "green" | "purple" | "gold";
-  };
+  chineseScore: number;
+  englishScore: number;
+  mathScore: number;
+  averageScore: number;
+  previousAverage: number;
+  hasHomeworkCompleted: boolean; // COMPLETED
+  hasCompletedAnyQuest: boolean;
+  equippedChip?: ChipId;
 }
 
 export interface MatchedPair {
-  playerA: BattleFighter;
-  playerB: BattleFighter;
-  winner: "A" | "B" | "DRAW";
+  player1: any;
+  player2: any;
+  winner: "P1" | "P2" | "DRAW";
   winnerId: string | null;
   isDraw: boolean;
-  battleLog: BattleLog;
+  battleLog: any;
 }
 
 /**
- * 有效戰力計算公式：
- * 有效戰力 = 三科平均 + (作業準時完成 ? 10 : 0) + (作業三題挑戰全對 ? 15 : 0) + (進步幅度 * 1.5)
+ * 30 秒 3 回合學力推演結算生成器
  */
-export function calculateEffectivePower(
-  averageScore: number,
-  hasHomeworkBuff: boolean,
-  allChallengesCorrect: boolean = false,
-  previousAverage: number = 0
-): {
-  effectivePower: number;
-  buff: number;
-  challengeBonus: number;
-  growthBonus: number;
-} {
-  const buff = hasHomeworkBuff ? 10 : 0;
-  const challengeBonus = allChallengesCorrect ? 15 : 0;
-  const improvement = previousAverage > 0 ? Math.max(0, averageScore - previousAverage) : 0;
-  const growthBonus = Math.round(improvement * 1.5 * 10) / 10;
-  const effectivePower = Math.round((averageScore + buff + challengeBonus + growthBonus) * 10) / 10;
-
-  return {
-    effectivePower,
-    buff,
-    challengeBonus,
-    growthBonus,
-  };
-}
-
-/**
- * 判定學員最高科目與專屬技能
- */
-export function getSubjectSkill(
-  chinese: number = 70,
-  english: number = 70,
-  math: number = 70
-): {
-  highestSubject: "CHINESE" | "ENGLISH" | "MATH";
-  skillName: string;
-  desc: string;
-} {
-  if (chinese >= english && chinese >= math) {
-    return {
-      highestSubject: "CHINESE",
-      skillName: "📚 詞藻狂嵐",
-      desc: "風暴詞章盤旋呼嘯，狂風席捲削弱對方防禦！",
-    };
-  } else if (english >= chinese && english >= math) {
-    return {
-      highestSubject: "ENGLISH",
-      skillName: "🔤 語法雷擊",
-      desc: "雷霆文法交錯劈裂，連續 3 段電弧無情轟炸！",
-    };
-  } else {
-    return {
-      highestSubject: "MATH",
-      skillName: "📐 幾何爆破",
-      desc: "多邊形矩陣奧義展開，幾何幾何力場引發劇烈震波！",
-    };
-  }
-}
-
-/**
- * 判定是否符合「逆轉奧義」發動資格
- * 條件：
- * 1. 成績進步 (平均 > 過去平均)
- * 2. 作業準時 + 三題挑戰全對
- * 3. 單科滿 90 分以上
- */
-export function checkUltimateEligibility(
-  averageScore: number,
-  previousAverage: number,
-  hasHomeworkBuff: boolean,
-  allChallengesCorrect: boolean,
-  chinese: number,
-  english: number,
-  math: number
-): { hasUltimate: boolean; reason: string } {
-  const improvement = previousAverage > 0 ? averageScore - previousAverage : 0;
-  if (improvement > 0.5) {
-    return {
-      hasUltimate: true,
-      reason: `本週平均成績進步 +${improvement.toFixed(1)} 分，激發奧義潛能！`,
-    };
-  }
-  if (hasHomeworkBuff && allChallengesCorrect) {
-    return {
-      hasUltimate: true,
-      reason: "作業按時繳交且作業三題挑戰全數答對，解鎖終極奧義！",
-    };
-  }
-  if (chinese >= 90 || english >= 90 || math >= 90) {
-    const topSub = chinese >= 90 ? "國文" : english >= 90 ? "英文" : "數學";
-    return {
-      hasUltimate: true,
-      reason: `${topSub}達到 90 分卓越門檻，觸發學霸奧義境界！`,
-    };
-  }
-  return {
-    hasUltimate: false,
-    reason: "尚未滿足奧義條件（需三科進步、作業+挑戰全對、或單科滿90分）",
-  };
-}
-
-/**
- * 35 秒 3 回合 16-bit 街機戰鬥計算引擎：
- * Round 1: 基礎交鋒 (5~15s, 依有效戰力差距扣除 15~25 HP)
- * Round 2: 學科絕技 (15~25s, 國英數最高科專屬絕技大招)
- * Round 3: 逆轉奧義 (25~35s, Super Flash 1秒黑屏、金色橫幅、8px 劇烈震動、CRITICAL -50 逆轉暴擊)
- * Finish: 戰果與親師因果分析卡片 (35~40s)
- */
-export function generateBattleLog(
-  fighterA: BattleFighter,
-  fighterB: BattleFighter,
+export function generate30sBattleLog(
+  p1: StudentInputScore,
+  p2: StudentInputScore,
   weekNumber: number,
   weekTitle: string
-): BattleLog {
-  const metaA = getAvatarMeta(fighterA.avatarId);
-  const metaB = getAvatarMeta(fighterB.avatarId);
+): any {
+  // 初始 HP = 週考三科平均分 (限制 35 ~ 100)
+  const initialHp1 = Math.min(100, Math.max(35, Math.round(p1.averageScore || 75)));
+  const initialHp2 = Math.min(100, Math.max(35, Math.round(p2.averageScore || 75)));
 
-  const skillA = getSubjectSkill(fighterA.chineseScore, fighterA.englishScore, fighterA.mathScore);
-  const skillB = getSubjectSkill(fighterB.chineseScore, fighterB.englishScore, fighterB.mathScore);
+  const chip1 = p1.equippedChip || (p1.hasCompletedAnyQuest ? "ADVERSITY_SHATTER" : p1.hasHomeworkCompleted ? "GUARDIAN_BASTION" : "SELF_TRANSCENDENCE");
+  const chip2 = p2.equippedChip || (p2.hasCompletedAnyQuest ? "ADVERSITY_SHATTER" : p2.hasHomeworkCompleted ? "GUARDIAN_BASTION" : "SELF_TRANSCENDENCE");
 
-  fighterA.highestSubject = skillA.highestSubject;
-  fighterA.highestSkillName = skillA.skillName;
-  fighterB.highestSubject = skillB.highestSubject;
-  fighterB.highestSkillName = skillB.skillName;
+  const metaChip1 = TACTICAL_CHIPS[chip1] || TACTICAL_CHIPS.ADVERSITY_SHATTER;
+  const metaChip2 = TACTICAL_CHIPS[chip2] || TACTICAL_CHIPS.GUARDIAN_BASTION;
 
-  // 基礎 HP (以三科平均成績為準，至少 35，最多 100)
-  const initialHpA = Math.min(100, Math.max(35, Math.round(fighterA.averageScore || fighterA.rawScore || 80)));
-  const initialHpB = Math.min(100, Math.max(35, Math.round(fighterB.averageScore || fighterB.rawScore || 80)));
+  // ----------------------------------------------------
+  // Round 1: 試探交鋒 (0~8s)
+  // 基礎扣血 12~18
+  // ----------------------------------------------------
+  let r1_dmgToP1 = 14 + Math.round((p2.averageScore - p1.averageScore) * 0.1);
+  let r1_dmgToP2 = 14 + Math.round((p1.averageScore - p2.averageScore) * 0.1);
 
-  fighterA.initialHp = initialHpA;
-  fighterB.initialHp = initialHpB;
-
-  let currentHpA = initialHpA;
-  let currentHpB = initialHpB;
-
-  const powerDiff = fighterA.effectivePower - fighterB.effectivePower;
-
-  // --- Round 1: 基礎交鋒 (5~15s) ---
-  // 依有效戰力差距扣除 15~25 HP
-  let r1_dmgA = 18;
-  let r1_dmgB = 18;
-  if (powerDiff > 0) {
-    r1_dmgB = Math.min(25, 18 + Math.round(powerDiff * 0.4));
-    r1_dmgA = Math.max(12, 18 - Math.round(powerDiff * 0.3));
-  } else if (powerDiff < 0) {
-    r1_dmgA = Math.min(25, 18 + Math.round(Math.abs(powerDiff) * 0.4));
-    r1_dmgB = Math.max(12, 18 - Math.round(Math.abs(powerDiff) * 0.3));
+  // 守護壁壘機制：前兩回合減免 50% 並反彈 15 點固定傷害
+  if (chip1 === "GUARDIAN_BASTION") {
+    r1_dmgToP1 = Math.round(r1_dmgToP1 * 0.5);
+    r1_dmgToP2 += 15;
   }
-  currentHpA = Math.max(10, currentHpA - r1_dmgA);
-  currentHpB = Math.max(10, currentHpB - r1_dmgB);
-
-  // --- Round 2: 學科絕技 (15~25s) ---
-  // 根據學科最高分施展技能
-  const r2_dmgB = Math.min(30, Math.max(15, Math.round((fighterA.rawScore || 75) * 0.28)));
-  const r2_dmgA = Math.min(30, Math.max(15, Math.round((fighterB.rawScore || 75) * 0.28)));
-  currentHpA = Math.max(5, currentHpA - r2_dmgA);
-  currentHpB = Math.max(5, currentHpB - r2_dmgB);
-
-  // --- Round 3: 逆轉奧義 (25~35s) ---
-  // 逆轉奧義判定：若弱勢方具有奧義且強勢方無奧義，觸發「逆轉勝」！
-  const ultA = fighterA.hasUltimate;
-  const ultB = fighterB.hasUltimate;
-
-  let r3_dmgA = 20;
-  let r3_dmgB = 20;
-  let r3_shake = true;
-  let r3_superFlash = ultA || ultB;
-
-  if (ultA && !ultB) {
-    // A 施展超必殺奧義，重創 B -50 點
-    r3_dmgB = 50;
-    r3_dmgA = 10;
-  } else if (ultB && !ultA) {
-    // B 施展超必殺奧義，重創 A -50 點
-    r3_dmgA = 50;
-    r3_dmgB = 10;
-  } else if (ultA && ultB) {
-    // 雙方同時爆發奧義！神仙對決！
-    if (fighterA.effectivePower >= fighterB.effectivePower) {
-      r3_dmgB = 48;
-      r3_dmgA = 42;
-    } else {
-      r3_dmgA = 48;
-      r3_dmgB = 42;
-    }
-  } else {
-    // 雙方無奧義，進行普通搏擊
-    if (powerDiff > 0) {
-      r3_dmgB = 25;
-      r3_dmgA = 15;
-    } else if (powerDiff < 0) {
-      r3_dmgA = 25;
-      r3_dmgB = 15;
-    }
+  if (chip2 === "GUARDIAN_BASTION") {
+    r1_dmgToP2 = Math.round(r1_dmgToP2 * 0.5);
+    r1_dmgToP1 += 15;
   }
 
-  currentHpA = Math.max(0, currentHpA - r3_dmgA);
-  currentHpB = Math.max(0, currentHpB - r3_dmgB);
+  r1_dmgToP1 = Math.max(8, Math.min(25, r1_dmgToP1));
+  r1_dmgToP2 = Math.max(8, Math.min(25, r1_dmgToP2));
 
-  fighterA.finalHp = currentHpA;
-  fighterB.finalHp = currentHpB;
+  // ----------------------------------------------------
+  // Round 2: 戰況升溫 (8~18s)
+  // 基礎扣血 18~24
+  // ----------------------------------------------------
+  let r2_dmgToP1 = 20;
+  let r2_dmgToP2 = 20;
 
-  // 判定勝負
-  let winner: "A" | "B" | "DRAW" = "DRAW";
+  if (p1.hasHomeworkCompleted) r2_dmgToP1 = Math.round(r2_dmgToP1 * 0.85); // 護盾減傷 15%
+  if (p2.hasHomeworkCompleted) r2_dmgToP2 = Math.round(r2_dmgToP2 * 0.85);
+
+  if (chip1 === "GUARDIAN_BASTION") {
+    r2_dmgToP1 = Math.round(r2_dmgToP1 * 0.5);
+    r2_dmgToP2 += 15;
+  }
+  if (chip2 === "GUARDIAN_BASTION") {
+    r2_dmgToP2 = Math.round(r2_dmgToP2 * 0.5);
+    r2_dmgToP1 += 15;
+  }
+
+  r2_dmgToP1 = Math.max(8, Math.min(30, r2_dmgToP1));
+  r2_dmgToP2 = Math.max(8, Math.min(30, r2_dmgToP2));
+
+  // ----------------------------------------------------
+  // Round 3: 晶片大招對轟 (18~28s)
+  // 大招依晶片機制結算
+  // ----------------------------------------------------
+  let r3_dmgToP1 = 25;
+  let r3_dmgToP2 = 25;
+
+  // 逆境破甲焰：若自身週考平均低於對手，全場傷害 +35%
+  if (chip1 === "ADVERSITY_SHATTER" && p1.averageScore < p2.averageScore) {
+    r3_dmgToP2 = Math.round(38 * 1.35); // 翻盤超量傷害
+  }
+  if (chip2 === "ADVERSITY_SHATTER" && p2.averageScore < p1.averageScore) {
+    r3_dmgToP1 = Math.round(38 * 1.35);
+  }
+
+  // 自我超越：必爆擊
+  if (chip1 === "SELF_TRANSCENDENCE" && p1.averageScore > p1.previousAverage) {
+    r3_dmgToP2 = Math.max(r3_dmgToP2, 45);
+  }
+  if (chip2 === "SELF_TRANSCENDENCE" && p2.averageScore > p2.previousAverage) {
+    r3_dmgToP1 = Math.max(r3_dmgToP1, 45);
+  }
+
+  // 幾何湮滅陣：穿透 30%
+  if (chip1 === "MATH_VOID" && p1.mathScore >= 85) {
+    r3_dmgToP2 = Math.max(r3_dmgToP2, 42);
+  }
+  if (chip2 === "MATH_VOID" && p2.mathScore >= 85) {
+    r3_dmgToP1 = Math.max(r3_dmgToP1, 42);
+  }
+
+  // 律動疾風矢：3 段打擊
+  if (chip1 === "ENGLISH_STORM" && p1.englishScore >= 85) {
+    r3_dmgToP2 = Math.max(r3_dmgToP2, 40);
+    r3_dmgToP1 = Math.round(r3_dmgToP1 * 0.8); // 削減對手 20%
+  }
+  if (chip2 === "ENGLISH_STORM" && p2.englishScore >= 85) {
+    r3_dmgToP1 = Math.max(r3_dmgToP1, 40);
+    r3_dmgToP2 = Math.round(r3_dmgToP2 * 0.8);
+  }
+
+  // 千字筆墨斬：吸血 30%
+  let healP1 = 0;
+  let healP2 = 0;
+  if (chip1 === "CHINESE_INK" && p1.chineseScore >= 85) {
+    r3_dmgToP2 = Math.max(r3_dmgToP2, 38);
+    healP1 = Math.round(r3_dmgToP2 * 0.3);
+  }
+  if (chip2 === "CHINESE_INK" && p2.chineseScore >= 85) {
+    r3_dmgToP1 = Math.max(r3_dmgToP1, 38);
+    healP2 = Math.round(r3_dmgToP1 * 0.3);
+  }
+
+  const finalHp1 = Math.max(0, initialHp1 - r1_dmgToP1 - r2_dmgToP1 - r3_dmgToP1 + healP1);
+  const finalHp2 = Math.max(0, initialHp2 - r1_dmgToP2 - r2_dmgToP2 - r3_dmgToP2 + healP2);
+
+  let winner: "P1" | "P2" | "DRAW" = "DRAW";
   let winnerName = "平局";
-  if (currentHpA > currentHpB) {
-    winner = "A";
-    winnerName = fighterA.name;
-  } else if (currentHpB > currentHpA) {
-    winner = "B";
-    winnerName = fighterB.name;
-  } else {
-    winner = "DRAW";
-    winnerName = "雙方平手";
+  if (finalHp1 > finalHp2) {
+    winner = "P1";
+    winnerName = p1.name;
+  } else if (finalHp2 > finalHp1) {
+    winner = "P2";
+    winnerName = p2.name;
   }
 
-  // 產生因果歸因分析文字
-  const reasonA =
-    winner === "A"
-      ? `${fighterA.highestSkillName} 奏效${ultA ? " + 達成條件解鎖逆轉奧義造成 -50 暴擊" : ""}${
-          fighterA.buff > 0 ? " + 作業按時完成保住護盾" : ""
-        }`
-      : `${fighterA.buff === 0 ? "作業缺交損失 10 戰力與氣量護盾；" : ""}${
-          !ultA && ultB ? `未能觸發奧義，遭到對手【${fighterB.highestSkillName}】逆轉` : "戰力些微差距惜敗"
-        }`;
+  // 勝負因果分析文本
+  let reason1 = "";
+  let reason2 = "";
 
-  const reasonB =
-    winner === "B"
-      ? `${fighterB.highestSkillName} 奏效${ultB ? " + 達成條件解鎖逆轉奧義造成 -50 暴擊" : ""}${
-          fighterB.buff > 0 ? " + 作業按時完成保住護盾" : ""
-        }`
-      : `${fighterB.buff === 0 ? "作業缺交損失 10 戰力與氣量護盾；" : ""}${
-          !ultB && ultA ? `未能觸發奧義，遭到對手【${fighterA.highestSkillName}】逆轉` : "戰力些微差距惜敗"
-        }`;
-
-  const steps: BattleStep[] = [
-    // Step 0: 0~5s 開場登場與 Buff 標記
-    {
-      step: 0,
-      round: 0,
-      type: "ENTRY",
-      title: "ROUND START",
-      desc: `${fighterA.name}（${metaA.name}，HP ${initialHpA}）VS ${fighterB.name}（${metaB.name}，HP ${initialHpB}）進場就緒！`,
-      shake: false,
-      superFlash: false,
-      hpAfterA: initialHpA,
-      hpAfterB: initialHpB,
-      actionText: "英雄進場",
-    },
-
-    // Step 1: 5~15s 第 1 回合 基礎交鋒
-    {
-      step: 1,
-      round: 1,
-      type: "ROUND_1",
-      title: "回合 1：基礎交鋒",
-      desc: `雙方短兵相接！${fighterA.name} 造成 ${r1_dmgB} 點傷害，${fighterB.name} 反擊造成 ${r1_dmgA} 點傷害！`,
-      shake: false,
-      superFlash: false,
-      damageToA: r1_dmgA,
-      damageToB: r1_dmgB,
-      hpAfterA: initialHpA - r1_dmgA,
-      hpAfterB: initialHpB - r1_dmgB,
-      actionText: "普攻交鋒",
-    },
-
-    // Step 2: 15~25s 第 2 回合 學科絕技
-    {
-      step: 2,
-      round: 2,
-      type: "ROUND_2_SKILL",
-      title: "回合 2：學科絕技！",
-      desc: `${fighterA.name} 施放【${skillA.skillName}】！${fighterB.name} 施展【${skillB.skillName}】！領域強烈衝擊！`,
-      shake: true,
-      superFlash: false,
-      skillNameA: skillA.skillName,
-      skillNameB: skillB.skillName,
-      damageToA: r2_dmgA,
-      damageToB: r2_dmgB,
-      hpAfterA: initialHpA - r1_dmgA - r2_dmgA,
-      hpAfterB: initialHpB - r1_dmgB - r2_dmgB,
-      actionText: "學科大招",
-    },
-
-    // Step 3: 25~35s 第 3 回合 逆轉奧義
-    {
-      step: 3,
-      round: 3,
-      type: "ROUND_3_ULTIMATE",
-      title: r3_superFlash ? "回合 3：🔥 逆轉奧義爆發！" : "回合 3：終局拼刀決戰！",
-      desc:
-        ultA && ultB
-          ? `⚡ 雙方同時發動逆轉奧義！金光蔽日，毀滅性衝擊震碎全場！`
-          : ultA
-          ? `🔥 ${fighterA.name} 觸發逆轉奧義！【${metaA.skillName}】全螢幕 Super Flash！造成 CRITICAL! -${r3_dmgB} 巨額暴擊！`
-          : ultB
-          ? `🔥 ${fighterB.name} 觸發逆轉奧義！【${metaB.skillName}】全螢幕 Super Flash！造成 CRITICAL! -${r3_dmgA} 巨額暴擊！`
-          : `雙方拼盡全力施展最後一擊！刀光劍影決出高下！`,
-      shake: true,
-      superFlash: r3_superFlash,
-      attacker: ultA && !ultB ? "A" : ultB && !ultA ? "B" : "BOTH",
-      skillNameA: metaA.skillName,
-      skillNameB: metaB.skillName,
-      damageToA: r3_dmgA,
-      damageToB: r3_dmgB,
-      hpAfterA: currentHpA,
-      hpAfterB: currentHpB,
-      actionText: r3_superFlash ? "🔥 逆轉奧義" : "終局拼刀",
-    },
-
-    // Step 4: 35~40s 終局結算
-    {
-      step: 4,
-      round: 4,
-      type: "FINISH",
-      title: winner === "DRAW" ? "勢均力敵 (Draw)" : "勝負揭曉 (Result)",
-      desc:
-        winner === "A"
-          ? `👑 恭喜 ${fighterA.name} 獲得勝利！剩餘 HP: ${currentHpA}`
-          : winner === "B"
-          ? `👑 恭喜 ${fighterB.name} 獲得勝利！剩餘 HP: ${currentHpB}`
-          : `兩位冒險者棋逢敵手，以平局落幕！`,
-      shake: false,
-      superFlash: false,
-      hpAfterA: currentHpA,
-      hpAfterB: currentHpB,
-    },
-  ];
+  if (winner === "P1") {
+    if (chip1 === "ADVERSITY_SHATTER" && p1.averageScore < p2.averageScore) {
+      reason1 = `逆轉關鍵：作業與自主修練全勤，裝備【${metaChip1.name}】觸發 +35% 逆境增傷，成功反殺高分對手！`;
+    } else if (chip1 === "GUARDIAN_BASTION") {
+      reason1 = `防守關鍵：作業準時全勤啟動【${metaChip1.name}】，成功吸收 50% 傷害並反彈 30 點傷害奠定勝局！`;
+    } else if (chip1 === "SELF_TRANSCENDENCE") {
+      reason1 = `成長關鍵：本週成績大幅進步觸發【${metaChip1.name}】，在第 3 回合必定爆擊奪勝！`;
+    } else {
+      reason1 = `學科實力：${p1.mathScore >= 85 ? "數學" : p1.chineseScore >= 85 ? "國文" : "英文"}精熟，發動【${metaChip1.name}】終結對局！`;
+    }
+    reason2 = p2.hasHomeworkCompleted ? "雖有作業護盾，但在第 3 回合晶片大招對轟中承受超量傷害惜敗。" : "作業缺交失去減傷護盾，未能抵擋對手大招擊破。";
+  } else if (winner === "P2") {
+    if (chip2 === "ADVERSITY_SHATTER" && p2.averageScore < p1.averageScore) {
+      reason2 = `逆轉關鍵：作業與自主修練全勤，裝備【${metaChip2.name}】觸發 +35% 逆境增傷，成功反殺高分對手！`;
+    } else {
+      reason2 = `勝因：裝備【${metaChip2.name}】發揮優勢，壓制對手。`;
+    }
+    reason1 = p1.hasHomeworkCompleted ? "雖有作業護盾，但在第 3 回合晶片對決中承受超量傷害惜敗。" : "作業缺交失去減傷護盾，未能抵擋對手大招擊破。";
+  } else {
+    reason1 = "雙方戰力旗鼓相當，三回合平分秋色。";
+    reason2 = "雙方戰力旗鼓相當，三回合平分秋色。";
+  }
 
   return {
     weekNumber,
     weekTitle,
-    playerA: fighterA,
-    playerB: fighterB,
-    damageA: initialHpA - currentHpA,
-    damageB: initialHpB - currentHpB,
+    player1: {
+      studentNumber: p1.studentNumber,
+      name: p1.name,
+      gender: p1.gender,
+      initialHp: initialHp1,
+      finalHp: finalHp1,
+      equippedChip: chip1,
+      chipName: metaChip1.name,
+      bannerColor: metaChip1.bannerColor,
+      hasHomeworkCompleted: p1.hasHomeworkCompleted,
+      averageScore: p1.averageScore,
+    },
+    player2: {
+      studentNumber: p2.studentNumber,
+      name: p2.name,
+      gender: p2.gender,
+      initialHp: initialHp2,
+      finalHp: finalHp2,
+      equippedChip: chip2,
+      chipName: metaChip2.name,
+      bannerColor: metaChip2.bannerColor,
+      hasHomeworkCompleted: p2.hasHomeworkCompleted,
+      averageScore: p2.averageScore,
+    },
     winner,
     winnerName,
-    summary: `${fighterA.name} (戰力 ${fighterA.effectivePower}) vs ${fighterB.name} (戰力 ${fighterB.effectivePower}) => ${winnerName}`,
     causalityAnalysis: {
-      reasonForA: reasonA,
-      reasonForB: reasonB,
+      reasonForP1: reason1,
+      reasonForP2: reason2,
     },
-    steps,
+    rounds: [
+      {
+        round: 1,
+        title: "Round 1 試探交鋒",
+        desc: "雙方迅速前衝互換普攻！",
+        damageToP1: r1_dmgToP1,
+        damageToP2: r1_dmgToP2,
+        shakePx: 2,
+      },
+      {
+        round: 2,
+        title: "Round 2 戰況升溫",
+        desc: "作業護盾與學科能力激戰，雙方逼近半血警戒線！",
+        damageToP1: r2_dmgToP1,
+        damageToP2: r2_dmgToP2,
+        shakePx: 4,
+      },
+      {
+        round: 3,
+        title: "Round 3 晶片大招對轟",
+        desc: `【${metaChip1.name}】對轟【${metaChip2.name}】！全螢幕超必殺爆發！`,
+        damageToP1: r3_dmgToP1,
+        damageToP2: r3_dmgToP2,
+        healP1,
+        healP2,
+        shakePx: 8,
+        superFlash: true,
+      },
+    ],
   };
 }
 
-export function pairAndGenerateMatches(
+export function pairAndGenerate30sMatches(
   inputs: StudentInputScore[],
   weekNumber: number,
   weekTitle: string
 ): MatchedPair[] {
-  const fighters: BattleFighter[] = inputs.map((s) => {
-    const avg = s.averageScore ?? s.rawScore ?? 75;
-    const prevAvg = s.previousAverage ?? avg;
-    const { effectivePower, buff, challengeBonus, growthBonus } = calculateEffectivePower(
-      avg,
-      s.hasHomeworkBuff,
-      s.allChallengesCorrect ?? false,
-      prevAvg
-    );
+  // 依有效戰力排序
+  const fighters = [...inputs].sort((a, b) => b.averageScore - a.averageScore);
 
-    const c = s.chineseScore ?? avg;
-    const e = s.englishScore ?? avg;
-    const m = s.mathScore ?? avg;
-
-    const { hasUltimate, reason: ultimateReason } = checkUltimateEligibility(
-      avg,
-      prevAvg,
-      s.hasHomeworkBuff,
-      s.allChallengesCorrect ?? false,
-      c,
-      e,
-      m
-    );
-
-    return {
-      id: s.studentId,
-      studentNumber: s.studentNumber,
-      name: s.name,
-      avatarId: s.avatarId,
-      rawScore: s.rawScore,
-      chineseScore: c,
-      englishScore: e,
-      mathScore: m,
-      averageScore: avg,
-      previousAverage: prevAvg,
-      buff,
-      challengeBonus,
-      growthBonus,
-      effectivePower,
-      initialHp: Math.round(avg),
-      finalHp: Math.round(avg),
-      hasUltimate,
-      ultimateReason,
-      isBot: false,
-      skin: s.skin,
-    };
-  });
-
-  fighters.sort((a, b) => b.effectivePower - a.effectivePower);
-
+  // 奇數時由替身補齊
   if (fighters.length % 2 !== 0) {
-    const lastPlayer = fighters[fighters.length - 1];
-    const botPower = Math.round(lastPlayer.effectivePower * 10) / 10;
-    const botAvg = Math.round(lastPlayer.averageScore || 75);
-    const bot: BattleFighter = {
-      id: "bot_sentinel",
+    const last = fighters[fighters.length - 1];
+    fighters.push({
       studentNumber: "BOT-999",
       name: "守門武士 (替身機器人)",
-      avatarId: "pixel-bot",
-      rawScore: botPower,
-      chineseScore: botAvg,
-      englishScore: botAvg,
-      mathScore: botAvg,
-      averageScore: botAvg,
-      previousAverage: botAvg,
-      buff: 0,
-      challengeBonus: 0,
-      growthBonus: 0,
-      effectivePower: botPower,
-      initialHp: botAvg,
-      finalHp: botAvg,
-      hasUltimate: false,
-      ultimateReason: "機器人無奧義加成",
-      isBot: true,
-      skin: {
-        gender: "boy",
-        charClass: "warrior",
-        color: "purple",
-      },
-    };
-    fighters.push(bot);
+      gender: "BOY",
+      studentId: "bot_sentinel",
+      chineseScore: last.averageScore,
+      englishScore: last.averageScore,
+      mathScore: last.averageScore,
+      averageScore: last.averageScore,
+      previousAverage: last.averageScore,
+      hasHomeworkCompleted: false,
+      hasCompletedAnyQuest: false,
+      equippedChip: "GUARDIAN_BASTION",
+    });
   }
 
   const pairs: MatchedPair[] = [];
   for (let i = 0; i < fighters.length; i += 2) {
-    const fighterA = fighters[i];
-    const fighterB = fighters[i + 1];
+    const f1 = fighters[i];
+    const f2 = fighters[i + 1];
 
-    const battleLog = generateBattleLog(fighterA, fighterB, weekNumber, weekTitle);
-
-    let winnerId: string | null = null;
-    let isDraw = false;
-
-    if (battleLog.winner === "A") {
-      winnerId = fighterA.isBot ? null : fighterA.id;
-    } else if (battleLog.winner === "B") {
-      winnerId = fighterB.isBot ? null : fighterB.id;
-    } else {
-      isDraw = true;
-    }
+    const battleLog = generate30sBattleLog(f1, f2, weekNumber, weekTitle);
+    const winner = battleLog.winner;
+    const winnerId = winner === "P1" ? f1.studentId : winner === "P2" ? f2.studentId : null;
 
     pairs.push({
-      playerA: fighterA,
-      playerB: fighterB,
-      winner: battleLog.winner,
-      winnerId,
-      isDraw,
+      player1: f1,
+      player2: f2,
+      winner,
+      winnerId: f1.studentId === "bot_sentinel" ? null : winnerId,
+      isDraw: winner === "DRAW",
       battleLog,
     });
   }

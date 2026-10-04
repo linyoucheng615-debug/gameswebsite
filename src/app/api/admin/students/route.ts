@@ -5,6 +5,9 @@ import { isAdminAuthenticated } from "@/lib/auth";
 export async function GET() {
   try {
     const students = await prisma.student.findMany({
+      where: {
+        studentNumber: { not: "BOT-999" },
+      },
       orderBy: { studentNumber: "asc" },
     });
     return NextResponse.json({ students });
@@ -22,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { studentNumber, name, parentPhone, avatarId } = body;
+    const { studentNumber, name, gender } = body;
 
     if (!studentNumber || !name) {
       return NextResponse.json({ error: "學號與姓名為必填" }, { status: 400 });
@@ -41,8 +44,7 @@ export async function POST(req: NextRequest) {
       data: {
         studentNumber: formattedNumber,
         name: name.trim(),
-        parentPhone: parentPhone ? parentPhone.trim() : null,
-        avatarId: avatarId || "pixel-knight",
+        gender: gender === "GIRL" ? "GIRL" : "BOY",
       },
     });
 

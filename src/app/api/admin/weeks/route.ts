@@ -11,7 +11,7 @@ export async function GET() {
           select: {
             homeworkRecords: true,
             examScores: true,
-            battleMatches: true,
+            matches: true,
           },
         },
       },
@@ -32,10 +32,10 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weekNumber, title, deadline } = body;
+    const { weekNumber, title } = body;
 
-    if (!weekNumber || !title || !deadline) {
-      return NextResponse.json({ error: "請填妥週次編號、單元名稱與補交期限" }, { status: 400 });
+    if (!weekNumber || !title) {
+      return NextResponse.json({ error: "請填妥週次編號與單元名稱" }, { status: 400 });
     }
 
     const existing = await prisma.academicWeek.findUnique({
@@ -50,13 +50,17 @@ export async function POST(req: NextRequest) {
       data: {
         weekNumber: Number(weekNumber),
         title: title.trim(),
-        deadline: deadline.trim(),
         isSettled: false,
       },
     });
 
-    // 自動為全班學生建立預設作業記錄 (completed, hasBuff: true)
-    const students = await prisma.student.findMany();
+    // 自動為全班學生建立預設作業記錄 (COMPLETED)
+    const students = await prisma.student.findMany({
+      where: {
+        studentNumber: { not: "BOT-999" },
+      },
+    });
+
     if (students.length > 0) {
       await prisma.$transaction(
         students.map((s) =>
@@ -64,9 +68,8 @@ export async function POST(req: NextRequest) {
             data: {
               weekId: week.id,
               studentId: s.id,
-              status: "completed",
+              status: "COMPLETED",
               missingScope: null,
-              hasBuff: true,
             },
           })
         )

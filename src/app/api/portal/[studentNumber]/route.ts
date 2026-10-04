@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { checkUltimateEligibility } from "@/lib/battleEngine";
+import { TACTICAL_CHIPS, isChipUnlocked, ChipId } from "@/lib/chips";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export async function GET(
       );
     }
 
-    // 2. 取得所有週次 (依週次排序)
+    // 2. 取得所有週次
     const weeks = await prisma.academicWeek.findMany({
       orderBy: { weekNumber: "asc" },
     });
@@ -37,47 +37,47 @@ export async function GET(
 
     const currentWeek = weeks[weeks.length - 1];
 
-    // 3. 取得學生當週作業與成績
+    // 3. 學生當週作業與成績
     const currentHomework = await prisma.homeworkRecord.findUnique({
       where: {
-        weekId_studentId: {
-          weekId: currentWeek.id,
+        studentId_weekId: {
           studentId: student.id,
+          weekId: currentWeek.id,
         },
       },
     });
 
     const currentScore = await prisma.examScore.findUnique({
       where: {
-        weekId_studentId: {
-          weekId: currentWeek.id,
+        studentId_weekId: {
           studentId: student.id,
+          weekId: currentWeek.id,
         },
       },
     });
 
-    // 4. 取得歷次各週成績、作業與班級平均 (用於 Recharts 折線圖)
+    // 4. 取得歷次各週成績、作業與班級平均 (用於 Recharts)
     const allExamScores = await prisma.examScore.findMany({
-      include: { week: true },
+      include: { academicWeek: true },
     });
 
     const studentExamScores = await prisma.examScore.findMany({
       where: { studentId: student.id },
-      include: { week: true },
-      orderBy: { week: { weekNumber: "asc" } },
+      include: { academicWeek: true },
+      orderBy: { academicWeek: { weekNumber: "asc" } },
     });
 
     const studentHomeworks = await prisma.homeworkRecord.findMany({
       where: { studentId: student.id },
-      include: { week: true },
+      include: { academicWeek: true },
     });
 
-    // 依週次計算全班平均
+    // 班級平均
     const weekClassAvgMap = new Map<string, number>();
     for (const w of weeks) {
       const scoresInWeek = allExamScores.filter((s) => s.weekId === w.id);
       if (scoresInWeek.length > 0) {
-        const sum = scoresInWeek.reduce((acc, curr) => acc + (curr.averageScore || curr.rawScore), 0);
+        const sum = scoresInWeek.reduce((acc, curr) => acc + (curr.averageScore || 0), 0);
         weekClassAvgMap.set(w.id, Math.round((sum / scoresInWeek.length) * 10) / 10);
       } else {
         weekClassAvgMap.set(w.id, 75);
@@ -87,10 +87,9 @@ export async function GET(
     const chartData = weeks.map((w) => {
       const score = studentExamScores.find((s) => s.weekId === w.id);
       const hw = studentHomeworks.find((h) => h.weekId === w.id);
-      const baseScore = score?.rawScore ?? 75;
-      const c = score?.chineseScore || baseScore;
-      const e = score?.englishScore || baseScore;
-      const m = score?.mathScore || baseScore;
+      const c = score?.chineseScore || 75;
+      const e = score?.englishScore || 75;
+      const m = score?.mathScore || 75;
       const avg = score?.averageScore || Math.round(((c + e + m) / 3) * 10) / 10;
 
       return {
@@ -101,178 +100,203 @@ export async function GET(
         math: m,
         average: avg,
         classAverage: weekClassAvgMap.get(w.id) ?? 75,
-        homeworkStatus: hw?.status ?? "completed",
+        homeworkStatus: hw?.status || "COMPLETED",
       };
     });
 
-    // 5. 取得當週錯題挑戰題目與學生作答紀錄
-    const weeklyChallenges = await (prisma as any).weeklyChallenge.findMany({
-      where: { weekId: currentWeek.id },
-      orderBy: { subject: "asc" },
-    });
-
-    const studentAnswers = await (prisma as any).studentChallengeAnswer.findMany({
+    // 5. 每週自主修練任務狀態與題目
+    const questLog = await prisma.studentWeeklyQuestLog.findUnique({
       where: {
-        studentId: student.id,
-        challenge: {
+        studentId_weekId: {
+          studentId: student.id,
           weekId: currentWeek.id,
         },
       },
     });
 
-    const answerMap = new Map<string, { isCorrect: boolean }>();
-    for (const ans of studentAnswers) {
-      answerMap.set(ans.challengeId, { isCorrect: ans.isCorrect });
-    }
+    const questions = await prisma.weeklyQuizQuestion.findMany({
+      where: { weekId: currentWeek.id },
+      orderBy: { createdAt: "asc" },
+    });
 
-    const formattedChallenges = weeklyChallenges.map((ch: any) => {
-      let parsedOptions: string[] = [];
-      try {
-        parsedOptions = typeof ch.options === "string" ? JSON.parse(ch.options) : ch.options;
-      } catch {
-        parsedOptions = ["A", "B", "C", "D"];
-      }
+    const quests = {
+      math: {
+        completed: questLog?.completedMath ?? false,
+        questions: questions
+          .filter((q) => q.category === "MATH")
+          .map((q) => ({
+            id: q.id,
+            questionText: q.questionText,
+            options: JSON.parse(q.options),
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation,
+          })),
+      },
+      chinese: {
+        completed: questLog?.completedChinese ?? false,
+        questions: questions
+          .filter((q) => q.category === "CHINESE")
+          .map((q) => ({
+            id: q.id,
+            questionText: q.questionText,
+            options: JSON.parse(q.options),
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation,
+          })),
+      },
+      english: {
+        completed: questLog?.completedEnglish ?? false,
+        questions: questions
+          .filter((q) => q.category === "ENGLISH")
+          .map((q) => ({
+            id: q.id,
+            questionText: q.questionText,
+            options: JSON.parse(q.options),
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation,
+          })),
+      },
+      vocab: {
+        completed: questLog?.completedVocab ?? false,
+        questions: questions
+          .filter((q) => q.category === "VOCAB")
+          .map((q) => ({
+            id: q.id,
+            questionText: q.questionText,
+            options: JSON.parse(q.options),
+            correctAnswer: q.correctAnswer,
+            explanation: q.explanation,
+          })),
+      },
+      hasUnlockedChip: questLog?.hasUnlockedChip ?? false,
+    };
 
-      const userAns = answerMap.get(ch.id);
+    // 6. 晶片解鎖狀態
+    const hasHwComp = currentHomework?.status === "COMPLETED";
+    const chipQualificationData = {
+      chineseScore: currentScore?.chineseScore || 0,
+      englishScore: currentScore?.englishScore || 0,
+      mathScore: currentScore?.mathScore || 0,
+      averageScore: currentScore?.averageScore || 0,
+      previousAverage: currentScore?.previousAverage || 0,
+      hasHomeworkCompleted: hasHwComp,
+      hasCompletedAnyQuest: questLog?.hasUnlockedChip ?? false,
+    };
 
+    const chipsList = (Object.keys(TACTICAL_CHIPS) as ChipId[]).map((cid) => {
+      const meta = TACTICAL_CHIPS[cid];
+      const { unlocked, reason } = isChipUnlocked(cid, chipQualificationData);
       return {
-        id: ch.id,
-        subject: ch.subject,
-        questionText: ch.questionText,
-        options: parsedOptions,
-        explanation: ch.explanation,
-        userAnswer: userAns ? { isCorrect: userAns.isCorrect } : null,
+        ...meta,
+        unlocked,
+        lockReason: reason,
       };
     });
 
-    const allChallengesCorrect =
-      formattedChallenges.length >= 3 &&
-      formattedChallenges.every((c: any) => c.userAnswer && c.userAnswer.isCorrect);
+    // 學生當週裝備的晶片
+    const loadout = await prisma.weeklyStudentLoadout.findUnique({
+      where: {
+        studentId_weekId: {
+          studentId: student.id,
+          weekId: currentWeek.id,
+        },
+      },
+    });
 
-    // 6. 逆轉奧義判定
-    const avgScore = currentScore?.averageScore ?? currentScore?.rawScore ?? 75;
-    const prevAvg = currentScore?.previousAverage ?? avgScore;
-    const hasHwBuff = currentHomework?.hasBuff ?? true;
-    const cScore = currentScore?.chineseScore ?? avgScore;
-    const eScore = currentScore?.englishScore ?? avgScore;
-    const mScore = currentScore?.mathScore ?? avgScore;
+    const equippedChip = loadout?.equippedChip || chipsList.find((c) => c.unlocked)?.id || "ADVERSITY_SHATTER";
 
-    const { hasUltimate, reason: ultimateReason } = checkUltimateEligibility(
-      avgScore,
-      prevAvg,
-      hasHwBuff,
-      allChallengesCorrect,
-      cScore,
-      eScore,
-      mScore
-    );
-
-    // 7. 當週對戰資料
-    const currentMatch = await prisma.battleMatch.findFirst({
+    // 7. 當週對戰推演
+    const match = await prisma.battleMatch.findFirst({
       where: {
         weekId: currentWeek.id,
-        OR: [{ playerAId: student.id }, { playerBId: student.id }],
+        OR: [{ player1Id: student.id }, { player2Id: student.id }],
       },
       include: {
-        playerA: true,
-        playerB: true,
+        player1: true,
+        player2: true,
       },
     });
 
     let matchView = null;
-    if (currentMatch) {
-      const isPlayerA = currentMatch.playerAId === student.id;
-      const opponent = isPlayerA ? currentMatch.playerB : currentMatch.playerA;
+    if (match) {
       let parsedLog = null;
       try {
-        parsedLog = JSON.parse(currentMatch.battleLog);
-      } catch (e) {
+        parsedLog = JSON.parse(match.battleLog);
+      } catch {
         parsedLog = null;
       }
-
-      let result: "win" | "loss" | "draw" | "pending" = "pending";
-      if (currentMatch.isDraw) {
-        result = "draw";
-      } else if (currentMatch.winnerId === student.id) {
-        result = "win";
-      } else {
-        result = "loss";
-      }
-
       matchView = {
-        matchId: currentMatch.id,
-        weekNumber: currentWeek.weekNumber,
-        weekTitle: currentWeek.title,
+        id: match.id,
         isSettled: currentWeek.isSettled,
+        player1: match.player1,
+        player2: match.player2,
+        winnerId: match.winnerId,
+        isDraw: match.isDraw,
         battleLog: parsedLog,
-        isPlayerA,
-        opponentName: opponent?.name || currentMatch.botName || "神秘對手",
-        opponentAvatar: opponent?.avatarId || currentMatch.botAvatar || "pixel-bot",
-        result,
-        mySkin: {
-          gender: student.skinGender || "boy",
-          charClass: student.skinClass || "warrior",
-          color: student.skinColor || "blue",
-        },
-        opponentSkin: opponent
-          ? {
-              gender: opponent.skinGender || "girl",
-              charClass: opponent.skinClass || "mage",
-              color: opponent.skinColor || "red",
-            }
-          : {
-              gender: "boy",
-              charClass: "warrior",
-              color: "purple",
-            },
-        myStartingHp: Math.round(avgScore),
-        opponentStartingHp: opponent ? 85 : 80,
-        myHasBuff: hasHwBuff,
-        opponentHasBuff: true,
       };
     }
 
-    const totalMatches = student.wins + student.losses + student.draws;
-    const winRate = totalMatches > 0 ? Math.round((student.wins / totalMatches) * 100) : 0;
+    // 8. 歷史戰績統計
+    const allMatches = await prisma.battleMatch.findMany({
+      where: {
+        OR: [{ player1Id: student.id }, { player2Id: student.id }],
+      },
+    });
+
+    let wins = 0;
+    let losses = 0;
+    let draws = 0;
+    for (const m of allMatches) {
+      if (m.isDraw) draws += 1;
+      else if (m.winnerId === student.id) wins += 1;
+      else if (m.winnerId) losses += 1;
+    }
+
+    const totalMatches = wins + losses + draws;
+    const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
 
     return NextResponse.json({
-      student,
-      currentWeek,
-      currentHomework: currentHomework
+      student: {
+        id: student.id,
+        studentNumber: student.studentNumber,
+        name: student.name,
+        gender: student.gender,
+      },
+      currentWeek: {
+        id: currentWeek.id,
+        weekNumber: currentWeek.weekNumber,
+        title: currentWeek.title,
+        isSettled: currentWeek.isSettled,
+      },
+      homework: currentHomework
         ? {
-            id: currentHomework.id,
             status: currentHomework.status,
             missingScope: currentHomework.missingScope,
-            hasBuff: currentHomework.hasBuff,
           }
-        : null,
-      currentScore: currentScore
+        : { status: "COMPLETED", missingScope: null },
+      examScore: currentScore
         ? {
-            id: currentScore.id,
-            rawScore: currentScore.rawScore,
             chineseScore: currentScore.chineseScore,
             englishScore: currentScore.englishScore,
             mathScore: currentScore.mathScore,
             averageScore: currentScore.averageScore,
             previousAverage: currentScore.previousAverage,
-            effectivePower: currentScore.effectivePower,
           }
         : null,
       stats: {
-        wins: student.wins,
-        losses: student.losses,
-        draws: student.draws,
+        wins,
+        losses,
+        draws,
         winRate,
       },
       chartData,
-      challenges: formattedChallenges,
-      allChallengesCorrect,
-      hasUltimate,
-      ultimateReason,
+      quests,
+      chips: chipsList,
+      equippedChip,
       match: matchView,
     });
   } catch (error: any) {
     console.error("GET /api/portal/[studentNumber] error:", error);
-    return NextResponse.json({ error: "載入整合看板資料失敗" }, { status: 500 });
+    return NextResponse.json({ error: "載入看板資料失敗" }, { status: 500 });
   }
 }

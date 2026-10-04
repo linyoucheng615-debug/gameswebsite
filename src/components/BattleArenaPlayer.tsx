@@ -2,115 +2,97 @@
 
 import { useEffect, useState, useRef } from "react";
 import {
-  Shield,
   RotateCcw,
   Sparkles,
   Volume2,
   VolumeX,
-  Flame,
   X,
   FastForward,
   Trophy,
+  Shield,
   Zap,
-  BookOpen,
-  ArrowRight,
 } from "lucide-react";
 import { retroAudio } from "@/lib/audioEngine";
-import { StudentBattleViewData, BattleLog } from "@/types";
-import PixelFighterSprite, {
-  SkinGender,
-  SkinClass,
-  SkinColor,
-  FighterAction,
-} from "@/components/PixelFighterSprite";
+import PixelFighterSprite, { FighterAction } from "@/components/PixelFighterSprite";
+import { TACTICAL_CHIPS, ChipId } from "@/lib/chips";
 
 interface BattleArenaPlayerProps {
-  data: StudentBattleViewData;
+  battleLog: any;
+  currentStudentNumber?: string;
   onClose?: () => void;
   autoStart?: boolean;
 }
 
 export default function BattleArenaPlayer({
-  data,
+  battleLog,
+  currentStudentNumber,
   onClose,
   autoStart = true,
 }: BattleArenaPlayerProps) {
-  const { student, currentMatch } = data;
-
-  // 取得對戰資料與腳本
-  const battleLog: BattleLog | null = currentMatch?.battleLog || null;
-  const fighterA = battleLog?.playerA;
-  const fighterB = battleLog?.playerB;
-
-  // 造型外觀
-  const mySkin = currentMatch?.mySkin || fighterA?.skin || {
-    gender: (student.skinGender as SkinGender) || "boy",
-    charClass: (student.skinClass as SkinClass) || "warrior",
-    color: (student.skinColor as SkinColor) || "blue",
+  const p1 = battleLog?.player1 || {
+    studentNumber: "S101",
+    name: "王小明",
+    gender: "BOY",
+    initialHp: 85,
+    finalHp: 35,
+    equippedChip: "ADVERSITY_SHATTER",
+    chipName: "逆境破甲焰",
+    hasHomeworkCompleted: true,
   };
 
-  const oppSkin = currentMatch?.opponentSkin || fighterB?.skin || {
-    gender: "girl" as SkinGender,
-    charClass: "mage" as SkinClass,
-    color: "red" as SkinColor,
+  const p2 = battleLog?.player2 || {
+    studentNumber: "S102",
+    name: "李依婷",
+    gender: "GIRL",
+    initialHp: 90,
+    finalHp: 20,
+    equippedChip: "GUARDIAN_BASTION",
+    chipName: "守護壁壘",
+    hasHomeworkCompleted: true,
   };
 
-  // 數值與狀態初始化 (0~5s)
-  // HP = 週考三科平均成績
-  const initialHpA = Math.min(100, Math.max(35, fighterA?.initialHp || currentMatch?.myStartingHp || 90));
-  const initialHpB = Math.min(100, Math.max(35, fighterB?.initialHp || currentMatch?.opponentStartingHp || 85));
+  const isMeP1 = !currentStudentNumber || currentStudentNumber === p1.studentNumber;
+  const chip1 = (p1.equippedChip as ChipId) || "ADVERSITY_SHATTER";
+  const chip2 = (p2.equippedChip as ChipId) || "GUARDIAN_BASTION";
+  const meta1 = TACTICAL_CHIPS[chip1] || TACTICAL_CHIPS.ADVERSITY_SHATTER;
+  const meta2 = TACTICAL_CHIPS[chip2] || TACTICAL_CHIPS.GUARDIAN_BASTION;
 
-  const hasBuffA = fighterA?.buff ? fighterA.buff > 0 : (currentMatch?.myHasBuff ?? true);
-  const hasBuffB = fighterB?.buff ? fighterB.buff > 0 : (currentMatch?.opponentHasBuff ?? false);
+  const initialHp1 = p1.initialHp || 85;
+  const initialHp2 = p2.initialHp || 85;
+  const rounds = battleLog?.rounds || [];
 
-  const allChallengesCorrectA = fighterA?.challengeBonus ? fighterA.challengeBonus > 0 : true;
-  const allChallengesCorrectB = fighterB?.challengeBonus ? fighterB.challengeBonus > 0 : false;
-
-  const hasUltA = fighterA?.hasUltimate ?? true;
-  const hasUltB = fighterB?.hasUltimate ?? false;
-
-  const skillNameA = fighterA?.highestSkillName || "📐 幾何爆破";
-  const skillNameB = fighterB?.highestSkillName || "🔤 語法雷擊";
+  const r1 = rounds[0] || { damageToP1: 15, damageToP2: 15 };
+  const r2 = rounds[1] || { damageToP1: 20, damageToP2: 20 };
+  const r3 = rounds[2] || { damageToP1: 30, damageToP2: 45, healP1: 0, healP2: 0 };
 
   // 狀態管理
-  // 階段 phase: 0 (0~5s 登場), 1 (5~15s R1普攻), 2 (15~25s R2學科絕技), 3 (25~35s R3逆轉奧義), 4 (35s+ 結算)
-  const [phase, setPhase] = useState<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
-  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1);
+  const [seconds, setSeconds] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // 雙方血量
-  const [hpA, setHpA] = useState<number>(initialHpA);
-  const [hpB, setHpB] = useState<number>(initialHpB);
+  const [hp1, setHp1] = useState(initialHp1);
+  const [hp2, setHp2] = useState(initialHp2);
 
-  // 氣量槽 (0 ~ 3)
-  const [energyA, setEnergyA] = useState<number>(hasBuffA ? 1 : 0);
-  const [energyB, setEnergyB] = useState<number>(hasBuffB ? 1 : 0);
+  const [action1, setAction1] = useState<FighterAction>("idle");
+  const [action2, setAction2] = useState<FighterAction>("idle");
 
-  // 角色精靈動作
-  const [actionA, setActionA] = useState<FighterAction>("idle");
-  const [actionB, setActionB] = useState<FighterAction>("idle");
+  const [floatDamage1, setFloatDamage1] = useState<{ val: number; isCrit?: boolean; isHeal?: boolean } | null>(null);
+  const [floatDamage2, setFloatDamage2] = useState<{ val: number; isCrit?: boolean; isHeal?: boolean } | null>(null);
 
-  // 飄字與特效
-  const [floatDamageA, setFloatDamageA] = useState<{ val: number; isCrit?: boolean } | null>(null);
-  const [floatDamageB, setFloatDamageB] = useState<{ val: number; isCrit?: boolean } | null>(null);
-  const [isShaking, setIsShaking] = useState<boolean>(false);
-  const [superFlashDark, setSuperFlashDark] = useState<boolean>(false);
-  const [activeBanner, setActiveBanner] = useState<{ title: string; subtitle: string; color: string } | null>(null);
+  const [shakeIntensity, setShakeIntensity] = useState<number>(0);
+  const [superFlash, setSuperFlash] = useState(false);
+  const [chipBanner, setChipBanner] = useState<{ title: string; desc: string; color: string } | null>(null);
+  const [activeChipAnim, setActiveChipAnim] = useState<ChipId | null>(null);
 
-  // 跑馬燈解說
-  const [commentary, setCommentary] = useState<string>("雙方冒險者就位，35 秒戰鬥引擎啟動！");
+  const [commentary, setCommentary] = useState("30 秒學力推演引擎準備就緒...");
+  const [finished, setFinished] = useState(false);
 
-  // 終局結果
-  const [finalWinner, setFinalWinner] = useState<"A" | "B" | "DRAW" | null>(null);
-
-  const activeTimersRef = useRef<any[]>([]);
+  const timersRef = useRef<any[]>([]);
   const intervalRef = useRef<any>(null);
 
-  function clearAllTimers() {
-    activeTimersRef.current.forEach((t) => clearTimeout(t));
-    activeTimersRef.current = [];
+  function clearTimers() {
+    timersRef.current.forEach((t) => clearTimeout(t));
+    timersRef.current = [];
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -119,342 +101,320 @@ export default function BattleArenaPlayer({
 
   useEffect(() => {
     return () => {
-      clearAllTimers();
+      clearTimers();
       retroAudio.stopBGM();
     };
   }, []);
 
   function toggleSound() {
-    const nextVal = !soundEnabled;
-    setSoundEnabled(nextVal);
-    retroAudio.setMuted(!nextVal);
-    if (nextVal && isPlaying) {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    retroAudio.setMuted(!next);
+    if (next && isPlaying) {
       retroAudio.startBGM();
     }
   }
 
-  // 啟動 35 秒戰鬥引擎
-  function run35sBattle(speed: number = 1) {
-    clearAllTimers();
+  // 30 秒推演時間軸排程
+  function startSimulation() {
+    clearTimers();
     setIsPlaying(true);
-    setPhase(0);
-    setElapsedSeconds(0);
-    setHpA(initialHpA);
-    setHpB(initialHpB);
-    setEnergyA(hasBuffA ? 1 : 0);
-    setEnergyB(hasBuffB ? 1 : 0);
-    setActionA("idle");
-    setActionB("idle");
-    setFloatDamageA(null);
-    setFloatDamageB(null);
-    setIsShaking(false);
-    setSuperFlashDark(false);
-    setActiveBanner(null);
-    setFinalWinner(null);
+    setFinished(false);
+    setSeconds(0);
+    setHp1(initialHp1);
+    setHp2(initialHp2);
+    setAction1("idle");
+    setAction2("idle");
+    setFloatDamage1(null);
+    setFloatDamage2(null);
+    setShakeIntensity(0);
+    setSuperFlash(false);
+    setChipBanner(null);
+    setActiveChipAnim(null);
 
     if (soundEnabled) {
       retroAudio.startBGM();
     }
 
-    // 計算各回合預估扣血 (若有 battleLog steps 則參照其數值)
-    const step1 = battleLog?.steps?.find((s) => s.type === "ROUND_1");
-    const step2 = battleLog?.steps?.find((s) => s.type === "ROUND_2_SKILL");
-    const step3 = battleLog?.steps?.find((s) => s.type === "ROUND_3_ULTIMATE");
-
-    const r1_dmgA = step1?.damageToA ?? 16;
-    const r1_dmgB = step1?.damageToB ?? 22;
-    const r2_dmgA = step2?.damageToA ?? 20;
-    const r2_dmgB = step2?.damageToB ?? 25;
-    const r3_dmgA = step3?.damageToA ?? (hasUltB ? 50 : 15);
-    const r3_dmgB = step3?.damageToB ?? (hasUltA ? 50 : 15);
-
-    const finishWinner = battleLog?.winner || (initialHpA - r1_dmgA - r2_dmgA - r3_dmgA > initialHpB - r1_dmgB - r2_dmgB - r3_dmgB ? "A" : "B");
-
-    // 秒數計時器
-    const secDuration = 1000 / speed;
-    let secCounter = 0;
+    let secCount = 0;
     intervalRef.current = setInterval(() => {
-      secCounter += 1;
-      setElapsedSeconds(secCounter);
-      if (secCounter >= 35) {
+      secCount += 1;
+      setSeconds(secCount);
+      if (secCount >= 30) {
         clearInterval(intervalRef.current);
       }
-    }, secDuration);
+    }, 1000);
 
     // ==========================================
-    // 0~5s：初始化與狀態登場 (Phase 0)
+    // 00:00 - 00:08【Round 1 試探交鋒】
     // ==========================================
-    setCommentary(`【0~5s 英雄登場】${student.name} VS ${currentMatch?.opponentName || "神秘對手"} 進入擂台！`);
-
-    // ==========================================
-    // 5~15s：第 1 回合 基礎交鋒 (Phase 1)
-    // ==========================================
-    const tR1 = setTimeout(() => {
-      setPhase(1);
-      setCommentary(`【ROUND 1 / 3 基礎交鋒】雙方短兵相接！試探攻擊互相衝撞！`);
-      setActionA("attack");
-      setActionB("attack");
+    setCommentary(`【0~8s Round 1 試探交鋒】雙方短兵相接，互換普攻！`);
+    const tR1_hit = setTimeout(() => {
+      setAction1("attack");
+      setAction2("attack");
       retroAudio.playSlash();
+      setShakeIntensity(2);
 
-      const tHit1 = setTimeout(() => {
-        setActionA("hurt");
-        setActionB("hurt");
-        setIsShaking(true);
+      const tR1_dmg = setTimeout(() => {
+        setAction1("hurt");
+        setAction2("hurt");
         retroAudio.playHit();
-        setFloatDamageA({ val: r1_dmgA });
-        setFloatDamageB({ val: r1_dmgB });
-        setHpA((prev) => Math.max(10, prev - r1_dmgA));
-        setHpB((prev) => Math.max(10, prev - r1_dmgB));
+        setFloatDamage1({ val: r1.damageToP1 });
+        setFloatDamage2({ val: r1.damageToP2 });
+        setHp1((h: number) => Math.max(10, h - r1.damageToP1));
+        setHp2((h: number) => Math.max(10, h - r1.damageToP2));
 
-        // 氣量增加
-        setEnergyA((e) => Math.min(3, e + 1));
-        setEnergyB((e) => Math.min(3, e + 1));
-
-        const tReset1 = setTimeout(() => {
-          setIsShaking(false);
-          setActionA("idle");
-          setActionB("idle");
-          setFloatDamageA(null);
-          setFloatDamageB(null);
-        }, 1200 / speed);
-        activeTimersRef.current.push(tReset1);
-      }, 1500 / speed);
-      activeTimersRef.current.push(tHit1);
-    }, 5000 / speed);
-    activeTimersRef.current.push(tR1);
+        const tR1_reset = setTimeout(() => {
+          setShakeIntensity(0);
+          setAction1("idle");
+          setAction2("idle");
+          setFloatDamage1(null);
+          setFloatDamage2(null);
+        }, 1200);
+        timersRef.current.push(tR1_reset);
+      }, 1000);
+      timersRef.current.push(tR1_dmg);
+    }, 2500);
+    timersRef.current.push(tR1_hit);
 
     // ==========================================
-    // 15~25s：第 2 回合 學科絕技 (Phase 2)
+    // 00:08 - 00:18【Round 2 戰況升溫】
     // ==========================================
     const tR2 = setTimeout(() => {
-      setPhase(2);
-      setActiveBanner({
-        title: `${skillNameA}  VS  ${skillNameB}`,
-        subtitle: "學科實力爆發！最高優勢科目大招碰撞！",
-        color: "from-blue-600 via-indigo-600 to-purple-600",
-      });
-      retroAudio.playMagic();
+      setCommentary(`【8~18s Round 2 戰況升溫】作業護盾減傷激戰，逼近半血警戒！`);
+      setAction1("attack");
+      setAction2("attack");
+      retroAudio.playSlash();
+      setShakeIntensity(4);
 
-      const tSkillFire = setTimeout(() => {
-        setActiveBanner(null);
-        setCommentary(`【ROUND 2 / 3 學科絕技】${student.name} 施展【${skillNameA}】衝擊對手！`);
-        setActionA("attack");
-        setActionB("attack");
+      const tR2_hit = setTimeout(() => {
+        setAction1("hurt");
+        setAction2("hurt");
+        retroAudio.playHit();
+        setFloatDamage1({ val: r2.damageToP1 });
+        setFloatDamage2({ val: r2.damageToP2 });
+        setHp1((h: number) => Math.max(10, h - r2.damageToP1));
+        setHp2((h: number) => Math.max(10, h - r2.damageToP2));
 
-        const tSkillHit = setTimeout(() => {
-          setActionA("hurt");
-          setActionB("hurt");
-          setIsShaking(true);
-          retroAudio.playHit();
-          setFloatDamageA({ val: r2_dmgA });
-          setFloatDamageB({ val: r2_dmgB });
-          setHpA((prev) => Math.max(5, prev - r2_dmgA));
-          setHpB((prev) => Math.max(5, prev - r2_dmgB));
-
-          const tReset2 = setTimeout(() => {
-            setIsShaking(false);
-            setActionA("idle");
-            setActionB("idle");
-            setFloatDamageA(null);
-            setFloatDamageB(null);
-          }, 1200 / speed);
-          activeTimersRef.current.push(tReset2);
-        }, 1500 / speed);
-        activeTimersRef.current.push(tSkillHit);
-      }, 2500 / speed);
-      activeTimersRef.current.push(tSkillFire);
-    }, 15000 / speed);
-    activeTimersRef.current.push(tR2);
+        const tR2_reset = setTimeout(() => {
+          setShakeIntensity(0);
+          setAction1("idle");
+          setAction2("idle");
+          setFloatDamage1(null);
+          setFloatDamage2(null);
+        }, 1200);
+        timersRef.current.push(tR2_reset);
+      }, 1200);
+      timersRef.current.push(tR2_hit);
+    }, 8500);
+    timersRef.current.push(tR2);
 
     // ==========================================
-    // 25~35s：第 3 回合 逆轉奧義 (Phase 3)
+    // 00:18 - 00:28【Round 3 晶片大招對轟】
     // ==========================================
     const tR3 = setTimeout(() => {
-      setPhase(3);
+      // 畫面全黑 0.6 秒 (Super Flash)
+      setSuperFlash(true);
+      setCommentary(`【18~28s Round 3 晶片大招】SUPER FLASH！裝備晶片奧義全場引爆！`);
+      retroAudio.playCrit();
 
-      if (hasUltA || hasUltB) {
-        // Super Flash 1 秒黑屏 + 金色橫幅
-        setSuperFlashDark(true);
-        setActiveBanner({
-          title: hasUltA ? "🔥 逆轉奧義：全場爆發！" : "⚡ 對手逆轉奧義就緒！",
-          subtitle: hasUltA ? (fighterA?.ultimateReason || "達成奧義條件，發動終極一擊！") : "對手爆發強大戰力！",
-          color: "from-amber-500 via-yellow-400 to-amber-600",
+      const tFlashEnd = setTimeout(() => {
+        setSuperFlash(false);
+        setAction1("cast");
+        setAction2("cast");
+
+        // 浮現金色招式橫幅
+        setChipBanner({
+          title: `【奧義・${meta1.name}】VS【奧義・${meta2.name}】`,
+          desc: `${meta1.effectDesc} • ${meta2.effectDesc}`,
+          color: meta1.bannerColor,
         });
-        retroAudio.playCrit();
 
-        const tFlashEnd = setTimeout(() => {
-          setSuperFlashDark(false);
-          setActiveBanner(null);
+        // 啟動專屬粒子動畫
+        setActiveChipAnim(chip1);
 
-          if (hasUltA) {
-            setActionA("attack");
-            setEnergyA(3);
-          }
-          if (hasUltB) {
-            setActionB("attack");
-            setEnergyB(3);
-          }
+        const tR3_impact = setTimeout(() => {
+          setShakeIntensity(8); // 劇烈震屏 8px
+          retroAudio.playCrit();
 
-          const tUltHit = setTimeout(() => {
-            setIsShaking(true);
-            retroAudio.playCrit();
-            if (hasUltA) {
-              setFloatDamageB({ val: r3_dmgB, isCrit: true });
-              setActionB("hurt");
-            }
-            if (hasUltB) {
-              setFloatDamageA({ val: r3_dmgA, isCrit: true });
-              setActionA("hurt");
-            }
+          setFloatDamage1({ val: r3.damageToP1, isCrit: true });
+          setFloatDamage2({ val: r3.damageToP2, isCrit: true });
 
-            setHpA((prev) => Math.max(0, prev - r3_dmgA));
-            setHpB((prev) => Math.max(0, prev - r3_dmgB));
+          setHp1((h: number) => Math.max(0, h - r3.damageToP1 + (r3.healP1 || 0)));
+          setHp2((h: number) => Math.max(0, h - r3.damageToP2 + (r3.healP2 || 0)));
 
-            const tReset3 = setTimeout(() => {
-              setIsShaking(false);
-              setFloatDamageA(null);
-              setFloatDamageB(null);
-            }, 1500 / speed);
-            activeTimersRef.current.push(tReset3);
-          }, 1500 / speed);
-          activeTimersRef.current.push(tUltHit);
-        }, 2000 / speed);
-        activeTimersRef.current.push(tFlashEnd);
-      } else {
-        // 普通終局拼刀
-        setCommentary("【ROUND 3 / 3 終局決戰】雙方拼盡全力，展開最後一波攻勢！");
-        setActionA("attack");
-        setActionB("attack");
-        retroAudio.playSlash();
+          setAction1(r3.damageToP1 >= r3.damageToP2 ? "hurt" : "attack");
+          setAction2(r3.damageToP2 >= r3.damageToP1 ? "hurt" : "attack");
 
-        const tClashHit = setTimeout(() => {
-          setIsShaking(true);
-          retroAudio.playHit();
-          setFloatDamageA({ val: r3_dmgA });
-          setFloatDamageB({ val: r3_dmgB });
-          setHpA((prev) => Math.max(0, prev - r3_dmgA));
-          setHpB((prev) => Math.max(0, prev - r3_dmgB));
-
-          const tReset3 = setTimeout(() => {
-            setIsShaking(false);
-            setFloatDamageA(null);
-            setFloatDamageB(null);
-          }, 1200 / speed);
-          activeTimersRef.current.push(tReset3);
-        }, 1500 / speed);
-        activeTimersRef.current.push(tClashHit);
-      }
-    }, 25000 / speed);
-    activeTimersRef.current.push(tR3);
+          const tR3_clean = setTimeout(() => {
+            setShakeIntensity(0);
+            setChipBanner(null);
+            setActiveChipAnim(null);
+            setFloatDamage1(null);
+            setFloatDamage2(null);
+          }, 2000);
+          timersRef.current.push(tR3_clean);
+        }, 3000);
+        timersRef.current.push(tR3_impact);
+      }, 600);
+      timersRef.current.push(tFlashEnd);
+    }, 18000);
+    timersRef.current.push(tR3);
 
     // ==========================================
-    // 35~40s：終局結算卡片 (Phase 4)
+    // 00:28 - 00:33【終局結算】
     // ==========================================
     const tFinish = setTimeout(() => {
-      finishBattle(finishWinner, r1_dmgA + r2_dmgA + r3_dmgA, r1_dmgB + r2_dmgB + r3_dmgB);
-    }, 35000 / speed);
-    activeTimersRef.current.push(tFinish);
+      finishBattle();
+    }, 28000);
+    timersRef.current.push(tFinish);
   }
 
-  function finishBattle(winState: "A" | "B" | "DRAW", totalDmgA: number, totalDmgB: number) {
-    clearAllTimers();
-    setPhase(4);
-    setElapsedSeconds(35);
+  function finishBattle() {
+    clearTimers();
+    setSeconds(30);
     setIsPlaying(false);
+    setFinished(true);
+    setSuperFlash(false);
+    setShakeIntensity(0);
+    setChipBanner(null);
+    setActiveChipAnim(null);
     retroAudio.stopBGM();
 
-    const finalHpA = Math.max(0, initialHpA - totalDmgA);
-    const finalHpB = Math.max(0, initialHpB - totalDmgB);
-    setHpA(finalHpA);
-    setHpB(finalHpB);
-    setFinalWinner(winState);
+    const final1 = p1.finalHp ?? 30;
+    const final2 = p2.finalHp ?? 15;
+    setHp1(final1);
+    setHp2(final2);
 
-    if (winState === "A") {
-      setActionA("win");
-      setActionB("die");
-      retroAudio.playVictory();
-      setCommentary(`【👑 勝利】${student.name} 贏得本週對戰！`);
-    } else if (winState === "B") {
-      setActionB("win");
-      setActionA("die");
-      retroAudio.playDefeat();
-      setCommentary(`【惜敗】對手技高一籌，下週繼續努力！`);
+    const winner = battleLog?.winner || (final1 > final2 ? "P1" : "P2");
+
+    if (winner === "P1") {
+      setAction1("win");
+      setAction2("die");
+      if (isMeP1) retroAudio.playVictory();
+      else retroAudio.playDefeat();
+      setCommentary(`【推演結算】${p1.name} 奪得勝利！`);
+    } else if (winner === "P2") {
+      setAction2("win");
+      setAction1("die");
+      if (!isMeP1) retroAudio.playVictory();
+      else retroAudio.playDefeat();
+      setCommentary(`【推演結算】${p2.name} 奪得勝利！`);
     } else {
-      setActionA("win");
-      setActionB("win");
+      setAction1("win");
+      setAction2("win");
       retroAudio.playDefeat();
-      setCommentary(`【勢均力敵】雙方戰成平手！`);
+      setCommentary("【推演結算】雙方勢均力敵，握手言和！");
     }
   }
 
-  // 立即跳過動畫按鈕
   function handleSkip() {
-    clearAllTimers();
-    const finishWinner = battleLog?.winner || "A";
-    const totalDmgA = battleLog?.damageA ?? 20;
-    const totalDmgB = battleLog?.damageB ?? 45;
-    finishBattle(finishWinner, totalDmgA, totalDmgB);
+    finishBattle();
   }
 
   useEffect(() => {
     if (autoStart) {
-      run35sBattle(speedMultiplier);
+      startSimulation();
     }
   }, []);
 
-  const isMyWin = finalWinner === "A";
-  const isMyLoss = finalWinner === "B";
-  const isMyDraw = finalWinner === "DRAW";
+  const winner = battleLog?.winner || (hp1 > hp2 ? "P1" : hp2 > hp1 ? "P2" : "DRAW");
+  const isWinnerMe = (winner === "P1" && isMeP1) || (winner === "P2" && !isMeP1);
+  const isDraw = winner === "DRAW";
 
-  const causalityA = battleLog?.causalityAnalysis?.reasonForA || (isMyWin ? "學科實力發揮 + 作業準時護盾助攻" : "作業缺漏或戰力些微差距惜敗");
-  const causalityB = battleLog?.causalityAnalysis?.reasonForB || "";
+  const causalityReason = isMeP1
+    ? battleLog?.causalityAnalysis?.reasonForP1
+    : battleLog?.causalityAnalysis?.reasonForP2;
 
   return (
     <div
-      className={`w-full bg-[#0b0f19] border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col text-slate-100 font-sans relative transition-all duration-300 ${
-        isShaking ? "translate-x-2 -translate-y-2" : ""
+      className={`w-full bg-[#0b0f19] border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl flex flex-col text-slate-100 font-sans relative transition-transform duration-100 ${
+        shakeIntensity === 2
+          ? "translate-x-0.5 -translate-y-0.5"
+          : shakeIntensity === 4
+          ? "translate-x-1 -translate-y-1"
+          : shakeIntensity === 8
+          ? "translate-x-2 -translate-y-2"
+          : ""
       }`}
     >
-      {/* Super Flash 全螢幕暗轉效果 */}
-      {superFlashDark && (
-        <div className="absolute inset-0 bg-black/90 z-40 flex flex-col items-center justify-center animate-pulse">
-          <div className="px-6 py-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-600 text-slate-950 font-black text-2xl sm:text-3xl tracking-widest shadow-2xl border-2 border-amber-300">
-            🔥 SUPER FLASH • 逆轉奧義
+      {/* Super Flash 全黑 0.6 秒 */}
+      {superFlash && (
+        <div className="absolute inset-0 bg-black z-50 flex items-center justify-center animate-fade-in">
+          <div className="text-amber-400 font-black text-2xl tracking-widest animate-pulse">
+            ⚡ SUPER FLASH
           </div>
         </div>
       )}
 
-      {/* 技能全螢幕橫幅 */}
-      {activeBanner && (
-        <div className="absolute top-1/3 left-0 right-0 z-30 flex flex-col items-center justify-center px-4 animate-in fade-in zoom-in duration-300">
-          <div className={`w-full max-w-lg bg-gradient-to-r ${activeBanner.color} text-white py-3 px-6 rounded-xl border border-white/30 shadow-2xl text-center`}>
-            <p className="font-pixel text-lg sm:text-xl font-bold tracking-wider">{activeBanner.title}</p>
-            <p className="text-xs text-white/90 mt-1 font-mono">{activeBanner.subtitle}</p>
+      {/* 晶片專屬 Canvas/CSS 粒子特效層 */}
+      {activeChipAnim && (
+        <div className="absolute inset-0 z-30 pointer-events-none overflow-hidden flex items-center justify-center">
+          {activeChipAnim === "MATH_VOID" && (
+            <div className="w-full h-full bg-blue-500/10 flex items-center justify-center">
+              <div className="w-64 h-64 border-4 border-cyan-400 rotate-45 animate-spin duration-700 shadow-[0_0_50px_rgba(34,211,238,0.8)]" />
+              <div className="absolute inset-x-0 h-1 bg-white shadow-[0_0_20px_white] animate-pulse" />
+            </div>
+          )}
+          {activeChipAnim === "CHINESE_INK" && (
+            <div className="w-full h-full bg-slate-900/40 flex items-center justify-center">
+              <div className="text-6xl font-serif text-amber-200/40 select-none animate-ping">墨</div>
+            </div>
+          )}
+          {activeChipAnim === "ADVERSITY_SHATTER" && (
+            <div className="w-full h-full bg-rose-500/15 flex items-center justify-center">
+              <div className="w-72 h-72 rounded-full border-4 border-rose-500 animate-ping shadow-[0_0_60px_rgba(244,63,94,0.9)]" />
+            </div>
+          )}
+          {activeChipAnim === "GUARDIAN_BASTION" && (
+            <div className="w-full h-full bg-emerald-500/10 flex items-center justify-center">
+              <div className="w-80 h-80 rounded-2xl border-4 border-emerald-400 shadow-[0_0_40px_rgba(52,211,153,0.8)]" />
+            </div>
+          )}
+          {activeChipAnim === "SELF_TRANSCENDENCE" && (
+            <div className="w-full h-full bg-yellow-500/20 flex items-center justify-center">
+              <div className="w-full h-24 bg-gradient-to-r from-amber-400 via-yellow-200 to-amber-500 shadow-[0_0_80px_gold] animate-pulse" />
+            </div>
+          )}
+          {activeChipAnim === "ENGLISH_STORM" && (
+            <div className="w-full h-full bg-amber-500/15 flex items-center justify-center">
+              <div className="w-full h-full border-t-4 border-b-4 border-amber-300 rotate-12 animate-pulse" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 晶片大招金色橫幅 */}
+      {chipBanner && (
+        <div className="absolute top-1/4 left-0 right-0 z-40 flex flex-col items-center justify-center px-4 animate-in zoom-in duration-300">
+          <div className={`w-full max-w-md bg-gradient-to-r ${chipBanner.color} text-white py-3 px-5 rounded-xl border border-white/40 shadow-2xl text-center`}>
+            <p className="font-bold text-base sm:text-lg tracking-wider text-amber-200">{chipBanner.title}</p>
+            <p className="text-[11px] text-white/90 mt-0.5">{chipBanner.desc}</p>
           </div>
         </div>
       )}
 
       {/* 頂部操作列 */}
-      <div className="px-4 py-3 bg-[#070b14]/95 border-b border-slate-800 flex items-center justify-between gap-3 flex-wrap relative z-20">
+      <div className="px-4 py-2.5 bg-[#070b14] border-b border-slate-800 flex items-center justify-between gap-3 text-xs z-20">
         <div className="flex items-center gap-2">
-          <span className="font-pixel text-[10px] text-amber-400 bg-amber-950/90 px-2 py-0.5 rounded border border-amber-500/40">
-            {phase === 0 ? "0~5s INTRO" : phase === 1 ? "5~15s R1 普攻" : phase === 2 ? "15~25s R2 絕技" : phase === 3 ? "25~35s R3 奧義" : "FINISH"}
+          <span className="font-mono text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40 text-[11px]">
+            {seconds < 8 ? "ROUND 1 試探" : seconds < 18 ? "ROUND 2 升溫" : seconds < 28 ? "ROUND 3 奧義" : "FINISH"}
           </span>
-          <span className="text-slate-200 text-xs sm:text-sm font-semibold truncate max-w-[200px] sm:max-w-md">
-            第 {currentMatch?.weekNumber || 1} 週 • 35s 街機格鬥舞台 ({elapsedSeconds}s / 35s)
+          <span className="text-slate-300 text-xs font-semibold">
+            30 秒學力推演回放 ({seconds}s / 30s)
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* ⏩ 跳過動畫按鈕 */}
-          {phase < 4 && (
+          {/* ⏩ 常駐跳過動畫按鈕 */}
+          {!finished && (
             <button
               type="button"
               onClick={handleSkip}
-              className="px-3 py-1.5 rounded text-xs font-bold bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-md shadow-amber-400/20 flex items-center gap-1 transition-all cursor-pointer"
+              className="px-3 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded text-xs flex items-center gap-1 shadow-sm transition-all"
             >
               <FastForward className="w-3.5 h-3.5 fill-current" />
-              <span>跳過動畫</span>
+              <span>跳過動畫 (Skip)</span>
             </button>
           )}
 
@@ -462,270 +422,176 @@ export default function BattleArenaPlayer({
           <button
             type="button"
             onClick={toggleSound}
-            className={`px-2.5 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
-              soundEnabled
-                ? "bg-indigo-950/80 text-indigo-300 border-indigo-500/60 hover:bg-indigo-900"
-                : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+            className={`px-2 py-1 rounded text-xs border ${
+              soundEnabled ? "bg-slate-800 text-cyan-400 border-cyan-500/40" : "bg-slate-800 text-slate-400 border-slate-700"
             }`}
           >
-            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> : <VolumeX className="w-3.5 h-3.5" />}
-            <span className="text-[11px] font-mono">{soundEnabled ? "音效 ON" : "靜音"}</span>
-          </button>
-
-          {/* 倍速切換 */}
-          <button
-            type="button"
-            onClick={() => {
-              const next = speedMultiplier === 1 ? 2 : 1;
-              setSpeedMultiplier(next);
-              run35sBattle(next);
-            }}
-            className="px-2.5 py-1.5 rounded text-[11px] font-mono font-bold bg-slate-800 text-amber-300 border border-slate-700 hover:border-amber-400 transition-colors"
-          >
-            {speedMultiplier}x
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
 
           {/* 重播 */}
           <button
             type="button"
-            onClick={() => run35sBattle(speedMultiplier)}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded font-pixel text-[10px] transition-all flex items-center gap-1 border border-slate-600 hover:border-amber-400"
+            onClick={startSimulation}
+            className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded border border-slate-700 text-xs flex items-center gap-1"
           >
             <RotateCcw className="w-3 h-3" />
-            <span>REPLAY</span>
+            <span>重播</span>
           </button>
 
-          {/* 關閉返回 */}
           {onClose && (
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-rose-950/80 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/60 rounded text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+              className="p-1 text-slate-400 hover:text-white rounded"
             >
               <X className="w-4 h-4" />
-              <span>關閉</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* 雙方血條與能量指示區 */}
-      <div className="px-4 py-3 bg-[#0d1424] border-b border-slate-800/80 grid grid-cols-2 gap-4 sm:gap-8 relative z-10">
-        {/* 左側玩家 (我方) */}
-        <div className="space-y-1.5">
+      {/* 雙方血量指示條 */}
+      <div className="px-6 py-3 bg-[#0d1424] border-b border-slate-800/80 grid grid-cols-2 gap-6 relative z-10">
+        {/* P1 */}
+        <div className="space-y-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-white flex items-center gap-1.5">
-              <span>{student.name}</span>
-              <span className="text-[10px] text-slate-400 font-mono">({student.studentNumber})</span>
+            <span className="font-bold text-white flex items-center gap-1">
+              <span>{p1.name}</span>
+              <span className="text-[10px] text-slate-400 font-mono">({p1.studentNumber})</span>
             </span>
-            <span className="font-mono font-bold text-emerald-400">{hpA} / {initialHpA} HP</span>
+            <span className="font-mono text-emerald-400 font-bold">{hp1} / {initialHp1} HP</span>
           </div>
-          {/* 血條 */}
-          <div className="w-full h-3 bg-slate-900 rounded-full border border-slate-700 overflow-hidden p-0.5">
+          <div className="w-full h-2.5 bg-slate-900 rounded-full border border-slate-700 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
-              style={{ width: `${Math.max(0, (hpA / initialHpA) * 100)}%` }}
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+              style={{ width: `${Math.max(0, (hp1 / initialHp1) * 100)}%` }}
             />
           </div>
-          {/* 氣量槽 */}
-          <div className="flex items-center gap-1 pt-0.5">
-            <span className="text-[10px] text-slate-400 font-pixel">ENERGY:</span>
-            {[0, 1, 2].map((idx) => (
-              <span
-                key={idx}
-                className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[9px] transition-all ${
-                  idx < energyA
-                    ? "bg-amber-400 border-amber-300 text-slate-950 shadow-sm shadow-amber-400/50"
-                    : "bg-slate-900 border-slate-700 text-slate-600"
-                }`}
-              >
-                ◆
-              </span>
-            ))}
+          <div className="flex items-center gap-1 text-[10px] text-slate-400 pt-0.5">
+            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+              {meta1.icon} {meta1.name}
+            </span>
           </div>
         </div>
 
-        {/* 右側玩家 (對手) */}
-        <div className="space-y-1.5 text-right">
+        {/* P2 */}
+        <div className="space-y-1 text-right">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-mono font-bold text-rose-400">{hpB} / {initialHpB} HP</span>
-            <span className="font-bold text-white flex items-center gap-1.5">
-              <span className="text-[10px] text-slate-400 font-mono">(對手)</span>
-              <span>{currentMatch?.opponentName || "神秘對手"}</span>
+            <span className="font-mono text-rose-400 font-bold">{hp2} / {initialHp2} HP</span>
+            <span className="font-bold text-white flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 font-mono">({p2.studentNumber})</span>
+              <span>{p2.name}</span>
             </span>
           </div>
-          {/* 血條 */}
-          <div className="w-full h-3 bg-slate-900 rounded-full border border-slate-700 overflow-hidden p-0.5">
+          <div className="w-full h-2.5 bg-slate-900 rounded-full border border-slate-700 overflow-hidden">
             <div
-              className="h-full rounded-full bg-gradient-to-l from-rose-500 to-amber-500 transition-all duration-300 ml-auto"
-              style={{ width: `${Math.max(0, (hpB / initialHpB) * 100)}%` }}
+              className="h-full bg-gradient-to-l from-rose-500 to-amber-500 transition-all duration-300 ml-auto"
+              style={{ width: `${Math.max(0, (hp2 / initialHp2) * 100)}%` }}
             />
           </div>
-          {/* 氣量槽 */}
-          <div className="flex items-center justify-end gap-1 pt-0.5">
-            <span className="text-[10px] text-slate-400 font-pixel">ENERGY:</span>
-            {[0, 1, 2].map((idx) => (
-              <span
-                key={idx}
-                className={`w-3.5 h-3.5 rounded-sm border flex items-center justify-center text-[9px] transition-all ${
-                  idx < energyB
-                    ? "bg-amber-400 border-amber-300 text-slate-950 shadow-sm shadow-amber-400/50"
-                    : "bg-slate-900 border-slate-700 text-slate-600"
-                }`}
-              >
-                ◆
-              </span>
-            ))}
+          <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 pt-0.5">
+            <span className="px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/40">
+              {meta2.icon} {meta2.name}
+            </span>
           </div>
         </div>
       </div>
 
       {/* 擂台主畫面 */}
-      <div className="h-64 sm:h-72 bg-gradient-to-b from-[#0a0f1d] via-[#10192e] to-[#0d1322] relative flex items-center justify-between px-8 sm:px-16 overflow-hidden">
-        {/* 背景網格與像素地面 */}
+      <div className="h-60 sm:h-64 bg-gradient-to-b from-[#0a0f1d] via-[#10192e] to-[#0d1322] relative flex items-center justify-between px-10 sm:px-20 overflow-hidden">
+        {/* 背景格線 */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1f293710_1px,transparent_1px),linear-gradient(to_bottom,#1f293710_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-slate-950 via-slate-900 to-transparent border-t border-slate-800 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-slate-950 to-transparent pointer-events-none" />
 
-        {/* 左側精靈 (我方) */}
+        {/* P1 精靈 */}
         <div className="relative flex flex-col items-center">
-          {/* 0~5s 開場 Buff 標籤浮動 */}
-          {phase === 0 && (
-            <div className="absolute -top-16 flex flex-col items-center gap-1 animate-bounce">
-              {hasBuffA && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-400/80 text-[10px] text-emerald-300 font-bold whitespace-nowrap shadow-md">
-                  🛡️ 作業準時：氣量+1
-                </span>
-              )}
-              {allChallengesCorrectA && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-950/90 border border-amber-400/80 text-[10px] text-amber-300 font-bold whitespace-nowrap shadow-md">
-                  ⚡ 挑戰全對：奧義就緒
-                </span>
-              )}
+          {floatDamage1 && (
+            <div className={`absolute -top-10 font-mono font-black z-30 ${floatDamage1.isCrit ? "text-xl text-amber-300 animate-bounce" : "text-lg text-rose-400"}`}>
+              {floatDamage1.isCrit ? `CRITICAL! -${floatDamage1.val}` : `-${floatDamage1.val}`}
             </div>
           )}
-
-          {/* 浮動傷害飄字 */}
-          {floatDamageA && (
-            <div className={`absolute -top-12 font-black font-mono animate-bounce z-30 ${floatDamageA.isCrit ? "text-2xl text-amber-300" : "text-xl text-rose-400"}`}>
-              {floatDamageA.isCrit ? `CRITICAL! -${floatDamageA.val}` : `-${floatDamageA.val}`}
-            </div>
-          )}
-
-          <div className="relative transform scale-125">
-            <PixelFighterSprite
-              gender={mySkin.gender}
-              charClass={mySkin.charClass}
-              color={mySkin.color}
-              action={actionA}
-              isOpponent={false}
-              size={110}
-            />
-          </div>
-          <span className="mt-2 text-xs font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
-            {student.name}
+          <PixelFighterSprite
+            gender={p1.gender}
+            action={action1}
+            isOpponent={false}
+            size={105}
+          />
+          <span className="mt-1 text-[11px] font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+            {p1.name}
           </span>
         </div>
 
-        {/* 中央戰況資訊 */}
-        <div className="flex flex-col items-center justify-center text-center z-10 space-y-2">
-          <div className="w-10 h-10 rounded-full bg-slate-900 border-2 border-slate-700 flex items-center justify-center shadow-inner">
-            <span className="font-pixel text-xs text-amber-400">VS</span>
+        {/* 中央 VS */}
+        <div className="text-center z-10 space-y-1">
+          <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center font-bold text-amber-400 text-xs mx-auto shadow-inner">
+            VS
           </div>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-950/60 px-2.5 py-1 rounded-full border border-slate-800/80">
-            {elapsedSeconds}s / 35s
+          <span className="text-[10px] font-mono text-slate-400 bg-slate-950/70 px-2 py-0.5 rounded border border-slate-800">
+            {seconds}s
           </span>
         </div>
 
-        {/* 右側精靈 (對手) */}
+        {/* P2 精靈 */}
         <div className="relative flex flex-col items-center">
-          {/* 0~5s 對手 Buff 標籤 */}
-          {phase === 0 && (
-            <div className="absolute -top-16 flex flex-col items-center gap-1 animate-bounce">
-              {hasBuffB && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-950/90 border border-emerald-400/80 text-[10px] text-emerald-300 font-bold whitespace-nowrap shadow-md">
-                  🛡️ 作業護盾+1
-                </span>
-              )}
+          {floatDamage2 && (
+            <div className={`absolute -top-10 font-mono font-black z-30 ${floatDamage2.isCrit ? "text-xl text-amber-300 animate-bounce" : "text-lg text-rose-400"}`}>
+              {floatDamage2.isCrit ? `CRITICAL! -${floatDamage2.val}` : `-${floatDamage2.val}`}
             </div>
           )}
-
-          {/* 浮動傷害飄字 */}
-          {floatDamageB && (
-            <div className={`absolute -top-12 font-black font-mono animate-bounce z-30 ${floatDamageB.isCrit ? "text-2xl text-amber-300" : "text-xl text-rose-400"}`}>
-              {floatDamageB.isCrit ? `CRITICAL! -${floatDamageB.val}` : `-${floatDamageB.val}`}
-            </div>
-          )}
-
-          <div className="relative transform scale-125">
-            <PixelFighterSprite
-              gender={oppSkin.gender}
-              charClass={oppSkin.charClass}
-              color={oppSkin.color}
-              action={actionB}
-              isOpponent={true}
-              size={110}
-            />
-          </div>
-          <span className="mt-2 text-xs font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
-            {currentMatch?.opponentName || "神秘對手"}
+          <PixelFighterSprite
+            gender={p2.gender}
+            action={action2}
+            isOpponent={true}
+            size={105}
+          />
+          <span className="mt-1 text-[11px] font-bold text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+            {p2.name}
           </span>
         </div>
       </div>
 
-      {/* 下方戰況解說跑馬燈 */}
-      <div className="px-4 py-2.5 bg-[#070b14] border-t border-slate-800 flex items-center justify-between text-xs text-slate-300">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-mono text-amber-300 font-semibold">{commentary}</span>
-        </div>
-        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
-          35s ARCADE ENGINE
-        </span>
+      {/* 下方戰況解說 */}
+      <div className="px-4 py-2 bg-[#070b14] border-t border-slate-800 text-xs text-amber-300 flex items-center gap-2">
+        <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+        <span className="font-mono truncate">{commentary}</span>
       </div>
 
-      {/* 35~40s 終局結算卡片 (Phase 4) */}
-      {phase === 4 && (
-        <div className="p-6 bg-slate-900/95 border-t-2 border-amber-400/80 flex flex-col items-center text-center space-y-4 animate-in fade-in slide-in-from-bottom duration-300">
+      {/* 終局結算卡片 */}
+      {finished && (
+        <div className="p-5 bg-slate-900 border-t-2 border-amber-400 flex flex-col items-center text-center space-y-3 animate-in fade-in duration-300">
           <div className="flex items-center gap-2">
-            <Trophy className={`w-8 h-8 ${isMyWin ? "text-amber-400" : isMyDraw ? "text-cyan-400" : "text-slate-500"}`} />
-            <h3 className="text-2xl font-black tracking-wider text-white">
-              {isMyWin ? "👑 恭喜獲得本週對戰勝利！" : isMyDraw ? "🤝 雙方勢均力敵 平手！" : "⚔️ 本週惜敗，下週再戰！"}
+            <Trophy className={`w-6 h-6 ${isWinnerMe ? "text-amber-400" : isDraw ? "text-cyan-400" : "text-slate-500"}`} />
+            <h3 className="text-xl font-bold text-white tracking-wider">
+              {isWinnerMe ? "👑 VICTORY • 推演勝出！" : isDraw ? "🤝 DRAW • 勢均力敵！" : "⚔️ DEFEAT • 本週惜敗"}
             </h3>
           </div>
 
-          {/* 因果歸因分析卡 */}
-          <div className="w-full max-w-xl bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-left space-y-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>親師生因果歸因分析報告</span>
+          <div className="w-full max-w-lg bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-left space-y-1.5">
+            <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5" />
+              <span>推演勝負因果分析報告</span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
-              • <strong className="text-white">{student.name}：</strong>{causalityA}
+            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+              {causalityReason || "努力完成作業與自主修練題目，解鎖核心晶片優勢。"}
             </p>
-            {causalityB && (
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans">
-                • <strong className="text-slate-300">對手：</strong>{causalityB}
-              </p>
-            )}
           </div>
 
-          {/* 獎勵與結算按鈕 */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pt-1">
             <button
               type="button"
-              onClick={() => run35sBattle(speedMultiplier)}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 border border-slate-700"
+              onClick={startSimulation}
+              className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded text-xs font-bold transition-colors"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>再次重播</span>
+              再次回放
             </button>
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-lg text-xs tracking-wider transition-colors"
+                className="px-5 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded text-xs transition-colors"
               >
-                返回看板大廳
+                返回看板
               </button>
             )}
           </div>
